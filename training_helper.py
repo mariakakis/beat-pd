@@ -3,6 +3,7 @@ from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, Gr
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import confusion_matrix, roc_auc_score, mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import label_binarize
+import mord
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -99,6 +100,9 @@ def train_user_model(Data, label_name, model_type):
                 model = xgb.XGBClassifier(objective="multi:softprob", random_state=RANDOM_SEED)
                 model.set_params(**{'num_class': len(train_classes)})
                 param_grid = dict(regression__n_estimators=np.arange(80, 121, 20))
+            elif model_type == ORDINAL:
+                model = mord.LogisticSE()
+                param_grid = dict(regression__alpha=np.arange(1, 6, 1))
             else:
                 raise Exception('Not a valid model type')
 

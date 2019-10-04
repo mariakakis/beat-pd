@@ -15,7 +15,7 @@ Data['tremor'] = Data.ID.apply(lambda x: Meta.loc[x, 'tremor'])
 print('Done processing data')
 
 # Train for each label
-for model_type in (RANDOM_FOREST, XGBOOST):
+for model_type in (RANDOM_FOREST, XGBOOST, ORDINAL):
     for label_type in ('on_off', 'dyskinesia', 'tremor'):
         print('Model:', model_type, ', Label:', label_type)
         train_user_model(Data, label_type, model_type)

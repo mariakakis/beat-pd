@@ -7,6 +7,7 @@ MIN_POINTS_PER_CLASS = 6
 
 RANDOM_FOREST = 'random forest'
 XGBOOST = 'xgboost'
+ORDINAL = 'ordinal'
 
 DEBUG_SUBJECTS = False
 
