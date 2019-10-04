@@ -11,6 +11,6 @@ ORDINAL = 'ordinal'
 
 RUN_PARALLEL = False
 
-DEBUG_SUBJECTS = False
+DEBUG = False
 
 RANDOM_SEED = 812

@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 def print_debug(text):
-    if DEBUG_SUBJECTS:
+    if DEBUG:
         print(text)
 
 
@@ -75,18 +75,19 @@ def train_user_model(Data, label_name, model_type):
                                                 (fold_idx % NUM_STRATIFIED_FOLDS)+1))
 
             # Get measurement_ids for each fold
-            id_train = id_table.ID.values[train_idxs]
-            id_test = id_table.ID.values[test_idxs]
+            id_train_set = id_table.ID.values[train_idxs]
+            id_test_set = id_table.ID.values[test_idxs]
 
             # Separate train and test
-            subj_data_train = subj_data[subj_data['ID'].isin(id_train)]
-            subj_data_test = subj_data[subj_data['ID'].isin(id_test)]
+            subj_data_train = subj_data[subj_data['ID'].isin(id_train_set)]
+            subj_data_test = subj_data[subj_data['ID'].isin(id_test_set)]
+            id_test = subj_data_test.ID.values
 
             # Separate into features and labels
             x_train = subj_data_train.iloc[:, :-7].values
             x_test = subj_data_test.iloc[:, :-7].values
             y_train = subj_data_train[label_name].values
-            y_test = subj_data_train[label_name].values
+            y_test = subj_data_test[label_name].values
             train_classes, test_classes = np.unique(y_train), np.unique(y_test)
 
             # Make sure that folds don't cut the data in a weird way
@@ -136,7 +137,7 @@ def train_user_model(Data, label_name, model_type):
             preds = np.concatenate([preds, pred])
 
             # Show subject confusion matrix
-            # if DEBUG_SUBJECTS:
+            # if DEBUG:
             #     plot_confusion(y_test, pred, 'Model: %s, Label: %s\nSubject: %s'
             #                    % (model_type, label_name, subject))
 
