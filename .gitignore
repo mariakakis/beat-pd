@@ -1,0 +1,11 @@
+/Metadata.csv
+/Watch_Features_Full.csv
+.gitignore
+.idea/.gitignore
+.idea/beat-pd.iml
+.idea/inspectionProfiles/
+.idea/libraries/
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+__pycache__/
