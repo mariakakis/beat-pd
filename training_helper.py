@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 def print_debug(text):
-    if DEBUG_USERS:
+    if DEBUG_SUBJECTS:
         print(text)
 
 
@@ -41,25 +41,27 @@ def plot_confusion(gts, preds, title):
 
 def train_user_model(Data, label_name, model_type):
     ground_truths, preds = np.array([]), np.array([])
+    data_quantity = pd.DataFrame(columns=['subject_id', 'samples'])
     scores = pd.DataFrame(columns=['subject_id', 'AUC', 'MSE', 'MAE'])
-    sorted_users = sorted(Data.subject_id.unique())
-    for user in sorted_users:
+    sorted_subjects = sorted(Data.subject_id.unique())
+    for subject in sorted_subjects:
         print_debug('--------------')
-        print('User: %s' % user)
+        print('Subject: %s' % subject)
 
-        # Get data belonging to a specific user
-        subj_data = Data[Data.subject_id == user].copy()
+        # Get data belonging to a specific subject
+        subj_data = Data[Data.subject_id == subject].copy()
         subj_data.sort_values(by='timestamp', inplace=True)
 
         # Remove cases where on_off is not labeled
         subj_data = subj_data[subj_data.on_off > -1]
+        data_quantity = data_quantity.append({'subject_id': subject, 'samples': len(subj_data)}, ignore_index=True)
 
         # Make sure there's enough data for analysis
         if len(subj_data) <= MIN_POINTS_PER_SUBJECT:
-            print_debug('Not enough data points for that user')
+            print_debug('Not enough data points for that subject')
             continue
         if min(subj_data[label_name].value_counts()) <= MIN_POINTS_PER_CLASS:
-            print_debug('Not enough data points for a class with that user')
+            print_debug('Not enough data points for a class with that subject')
             continue
 
         # Separate into features and labels
@@ -70,14 +72,14 @@ def train_user_model(Data, label_name, model_type):
         for fold_idx, (train_idxs, test_idxs) in enumerate(list(rskf.split(subj_data.ID, subj_data[label_name]))):
             print_debug('Round: %d, Fold %d' % (int(fold_idx/NUM_STRATIFIED_FOLDS)+1,
                                                 (fold_idx % NUM_STRATIFIED_FOLDS)+1))
+            # Separate train and test
             x_train, x_test = x[train_idxs, :], x[test_idxs, :]
             y_train, y_test = y[train_idxs], y[test_idxs]
 
             train_classes, test_classes = np.unique(y_train), np.unique(y_test)
             id_test = subj_data.ID.values[test_idxs]
 
-            # Check that classes align properly
-            # TODO: maybe these checks can be moved before loop?
+            # Make sure that folds don't cut the data in a weird way
             if len(train_classes) <= 1:
                 print_debug('Not enough classes in train')
                 continue
@@ -88,7 +90,8 @@ def train_user_model(Data, label_name, model_type):
                 print_debug('There is a test class that is not in train')
                 continue
 
-            # Pick the correct model model
+            # Pick the correct model
+            # TODO: add regression?
             if model_type == RANDOM_FOREST:
                 model = RandomForestClassifier(random_state=RANDOM_SEED)
                 param_grid = dict(regression__n_estimators=np.arange(10, 51, 10))
@@ -119,10 +122,10 @@ def train_user_model(Data, label_name, model_type):
             ground_truths = np.concatenate([ground_truths, y_test])
             preds = np.concatenate([preds, pred])
 
-            # Show user confusion matrix
-            # if DEBUG_USERS:
+            # Show subject confusion matrix
+            # if DEBUG_SUBJECTS:
             #     plot_confusion(y_test, pred, 'Model: %s, Label: %s\nSubject: %s'
-            #                    % (model_type, label_name, user))
+            #                    % (model_type, label_name, subject))
 
             # Bin probabilities over each diary entry
             # TODO: what does this do?
@@ -161,7 +164,7 @@ def train_user_model(Data, label_name, model_type):
             print_debug('AUC: %0.2f' % auc)
 
             # Add scores
-            scores = scores.append({'subject_id': user, 'AUC': auc, 'MSE': mse, 'MAE': mae},
+            scores = scores.append({'subject_id': subject, 'AUC': auc, 'MSE': mse, 'MAE': mae},
                                    ignore_index=True)
 
     # Compute means and CIs
@@ -174,14 +177,18 @@ def train_user_model(Data, label_name, model_type):
     title += 'AUC = %0.2f±%0.2f\n' % (auc_mean, auc_stderr)
     title += 'MSE = %0.2f±%0.2f, MAE = %0.2f±%0.2f' % (mse_mean, mse_stderr, mae_mean, mae_stderr)
 
+    # Create x-ticks
+    x_ticks = ['%d (%d)' % (subj, quant) for subj, quant in zip(data_quantity.subject_id.values, data_quantity.samples.values)
+               if subj in scores.subject_id.values]
+
     # Plot boxplot of AUCs
-    num_users = len(sorted_users)
+    sns.set(style="whitegrid")
     fig = plt.figure()
     ax = fig.add_subplot(111)
     sns.boxplot(x='subject_id', y='AUC', data=scores)
     plt.title(title)
-    plt.axhline(0.5, 0, num_users, color='k', linestyle='--')
-    ax.set_xticklabels(sorted_users), plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
-    plt.xlabel('Subject ID')
+    plt.axhline(0.5, 0, len(sorted_subjects), color='k', linestyle='--')
+    ax.set_xticklabels(x_ticks), plt.setp(ax.xaxis.get_majorticklabels(), rotation=90)
+    plt.xlabel('Subject ID (#samples)')
     plt.ylabel('AUC'), plt.ylim(0, 1)
     plt.show()
