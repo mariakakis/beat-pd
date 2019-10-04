@@ -9,6 +9,8 @@ RANDOM_FOREST = 'random forest'
 XGBOOST = 'xgboost'
 ORDINAL = 'ordinal'
 
+RUN_PARALLEL = False
+
 DEBUG_SUBJECTS = False
 
 RANDOM_SEED = 812

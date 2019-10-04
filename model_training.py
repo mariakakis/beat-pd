@@ -1,6 +1,9 @@
 import pandas as pd
 from settings import *
 from training_helper import train_user_model
+from joblib import Parallel, delayed
+import itertools
+
 
 # Get all of the metadata into the main data frame
 Data = pd.read_csv('./Watch_Features_Full.csv')
@@ -15,8 +18,13 @@ Data['tremor'] = Data.ID.apply(lambda x: Meta.loc[x, 'tremor'])
 print('Done processing data')
 
 # Train for each label
-for model_type in (RANDOM_FOREST, XGBOOST, ORDINAL):
-    for label_type in ('on_off', 'dyskinesia', 'tremor'):
-        print('Model:', model_type, ', Label:', label_type)
-        train_user_model(Data, label_type, model_type)
-        print('**********************')
+model_types = [RANDOM_FOREST, XGBOOST, ORDINAL]
+label_names = ['on_off', 'dyskinesia', 'tremor']
+if not RUN_PARALLEL:
+    for model_type in model_types:
+        for label_name in label_names:
+            train_user_model(Data, label_name, model_type)
+else:
+    combinations = list(itertools.product(model_types, label_names))
+    Parallel(n_jobs=2)(delayed(train_user_model)(Data, label_name, model_type)
+                       for (label_name, model_type) in combinations)

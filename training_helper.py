@@ -41,6 +41,7 @@ def plot_confusion(gts, preds, title):
 
 
 def train_user_model(Data, label_name, model_type):
+    print('Model:', model_type, ', Label:', label_name)
     ground_truths, preds = np.array([]), np.array([])
     data_quantity = pd.DataFrame(columns=['subject_id', 'samples'])
     scores = pd.DataFrame(columns=['subject_id', 'AUC', 'MSE', 'MAE'])
@@ -196,3 +197,4 @@ def train_user_model(Data, label_name, model_type):
     plt.xlabel('Subject ID (#samples)')
     plt.ylabel('AUC'), plt.ylim(0, 1)
     plt.show()
+    print('**********************')
