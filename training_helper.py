@@ -58,28 +58,36 @@ def train_user_model(Data, label_name, model_type):
         subj_data = subj_data[subj_data.on_off > -1]
         data_quantity = data_quantity.append({'subject_id': subject, 'samples': len(subj_data)}, ignore_index=True)
 
+        # Make a table that just has unique measurement_ids and labels for the user
+        id_table = subj_data[['ID', label_name]].drop_duplicates()
+
         # Make sure there's enough data for analysis
-        if len(subj_data) <= MIN_POINTS_PER_SUBJECT:
+        if len(id_table) <= MIN_POINTS_PER_SUBJECT:
             print_debug('Not enough data points for that subject')
             continue
-        if min(subj_data[label_name].value_counts()) <= MIN_POINTS_PER_CLASS:
+        if min(id_table[label_name].value_counts()) <= MIN_POINTS_PER_CLASS:
             print_debug('Not enough data points for a class with that subject')
             continue
 
-        # Separate into features and labels
-        x = subj_data.iloc[:, :-7].values
-        y = subj_data[label_name].values
-
         rskf = RepeatedStratifiedKFold(n_splits=NUM_STRATIFIED_FOLDS, n_repeats=NUM_STRATIFIED_ROUNDS, random_state=RANDOM_SEED)
-        for fold_idx, (train_idxs, test_idxs) in enumerate(list(rskf.split(subj_data.ID, subj_data[label_name]))):
+        for fold_idx, (train_idxs, test_idxs) in enumerate(list(rskf.split(id_table.ID, id_table[label_name]))):
             print_debug('Round: %d, Fold %d' % (int(fold_idx/NUM_STRATIFIED_FOLDS)+1,
                                                 (fold_idx % NUM_STRATIFIED_FOLDS)+1))
-            # Separate train and test
-            x_train, x_test = x[train_idxs, :], x[test_idxs, :]
-            y_train, y_test = y[train_idxs], y[test_idxs]
 
+            # Get measurement_ids for each fold
+            id_train = id_table.ID.values[train_idxs]
+            id_test = id_table.ID.values[test_idxs]
+
+            # Separate train and test
+            subj_data_train = subj_data[subj_data['ID'].isin(id_train)]
+            subj_data_test = subj_data[subj_data['ID'].isin(id_test)]
+
+            # Separate into features and labels
+            x_train = subj_data_train.iloc[:, :-7].values
+            x_test = subj_data_test.iloc[:, :-7].values
+            y_train = subj_data_train[label_name].values
+            y_test = subj_data_train[label_name].values
             train_classes, test_classes = np.unique(y_train), np.unique(y_test)
-            id_test = subj_data.ID.values[test_idxs]
 
             # Make sure that folds don't cut the data in a weird way
             if len(train_classes) <= 1:
