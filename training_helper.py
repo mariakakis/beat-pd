@@ -31,8 +31,7 @@ def compute_mean_ci(x):
 def plot_confusion(gts, preds, title):
     lab = sorted(np.unique(gts))
     cmat = confusion_matrix(gts, preds, labels=lab)
-    norm_cmat = cmat/np.sum(cmat, axis=1).reshape([-1, 1])
-    # norm_cmat = cmat / np.sum(cmat, axis=0).reshape([1, -1])
+    # norm_cmat = cmat/np.sum(cmat, axis=1).reshape([-1, 1])
     plt.figure()
     plt.title(title)
     sns.heatmap(cmat, annot=True, fmt='d')
@@ -42,7 +41,7 @@ def plot_confusion(gts, preds, title):
 
 def train_user_model(Data, label_name, model_type):
     ground_truths, preds = np.array([]), np.array([])
-    scores = pd.DataFrame(columns=['subject_id', 'binned', 'AUC', 'MSE', 'MAE'])
+    scores = pd.DataFrame(columns=['subject_id', 'AUC', 'MSE', 'MAE'])
     sorted_users = sorted(Data.subject_id.unique())
     for user in sorted_users:
         print_debug('--------------')
@@ -151,63 +150,38 @@ def train_user_model(Data, label_name, model_type):
                     y_test_bin_binary = np.delete(y_test_bin_binary, i, axis=1)
 
             # Calculate MSE and MAE
-            mse = mean_squared_error(y_test, pred)
-            binned_mse = mean_squared_error(y_test_bin, pred_bin)
-            mae = mean_absolute_error(y_test, pred)
-            binned_mae = mean_absolute_error(y_test_bin, pred_bin)
+            mse = mean_squared_error(y_test_bin, pred_bin)
+            mae = mean_absolute_error(y_test_bin, pred_bin)
 
-            # Calculate regular and binned AUCs
+            # Calculate AUCs
             if len(lab) > 2:
-                auc = roc_auc_score(y_test_binary, probs, average='weighted')
-                binned_auc = roc_auc_score(y_test_bin_binary, probs_bin, average='weighted')
+                auc = roc_auc_score(y_test_bin_binary, probs_bin, average='weighted')
             else:
-                auc = roc_auc_score(y_test_binary, probs[:, 0], average='weighted')
-                binned_auc = roc_auc_score(y_test_bin_binary, probs_bin[:, 0], average='weighted')
-            print_debug('Regular AUC: %0.2f' % auc)
-            print_debug('Binned AUC: %0.2f' % binned_auc)
+                auc = roc_auc_score(y_test_bin_binary, probs_bin[:, 0], average='weighted')
+            print_debug('AUC: %0.2f' % auc)
 
             # Add scores
-            scores = scores.append({'subject_id': user, 'binned': 'raw',
-                                    'AUC': auc, 'MSE': mse, 'MAE': mae},
+            scores = scores.append({'subject_id': user, 'AUC': auc, 'MSE': mse, 'MAE': mae},
                                    ignore_index=True)
-            scores = scores.append({'subject_id': user, 'binned': 'binned',
-                                    'AUC': binned_auc, 'MSE': binned_mse, 'MAE': binned_mae},
-                                   ignore_index=True)
-
-    # Grab stats
-    raw_aucs = scores[scores.binned == 'raw'].AUC
-    raw_mses = scores[scores.binned == 'raw'].MSE
-    raw_maes = scores[scores.binned == 'raw'].MAE
-    binned_aucs = scores[scores.binned == 'binned'].AUC
-    binned_mses = scores[scores.binned == 'binned'].MSE
-    binned_maes = scores[scores.binned == 'binned'].MAE
 
     # Compute means and CIs
-    raw_auc_mean, raw_auc_stderr = compute_mean_ci(raw_aucs)
-    raw_mse_mean, raw_mse_stderr = compute_mean_ci(raw_mses)
-    raw_mae_mean, raw_mae_stderr = compute_mean_ci(raw_maes)
-    binned_auc_mean, binned_auc_stderr = compute_mean_ci(binned_aucs)
-    binned_mse_mean, binned_mse_stderr = compute_mean_ci(binned_mses)
-    binned_mae_mean, binned_mae_stderr = compute_mean_ci(binned_maes)
+    auc_mean, auc_stderr = compute_mean_ci(scores.AUC)
+    mse_mean, mse_stderr = compute_mean_ci(scores.MSE)
+    mae_mean, mae_stderr = compute_mean_ci(scores.MAE)
 
     # Create title
     title = 'Model: %s, Label: %s\n' % (model_type, label_name)
-    title += 'Raw: AUC = %0.2f±%0.2f, MSE = %0.2f±%0.2f, MAE = %0.2f±%0.2f\n' % \
-             (raw_auc_mean, raw_auc_stderr, raw_mse_mean, raw_mse_stderr, raw_mae_mean, raw_mae_stderr)
-    title += 'Binned: AUC = %0.2f±%0.2f, MSE = %0.2f±%0.2f, MAE = %0.2f±%0.2f' % \
-             (binned_auc_mean, binned_auc_stderr, binned_mse_mean, binned_mse_stderr, binned_mae_mean, binned_mae_stderr)
+    title += 'AUC = %0.2f±%0.2f\n' % (auc_mean, auc_stderr)
+    title += 'MSE = %0.2f±%0.2f, MAE = %0.2f±%0.2f' % (mse_mean, mse_stderr, mae_mean, mae_stderr)
 
     # Plot boxplot of AUCs
     num_users = len(sorted_users)
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    sns.boxplot(x='subject_id', y='AUC', data=scores, hue='binned')
+    sns.boxplot(x='subject_id', y='AUC', data=scores)
     plt.title(title)
     plt.axhline(0.5, 0, num_users, color='k', linestyle='--')
     ax.set_xticklabels(sorted_users), plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
     plt.xlabel('Subject ID')
     plt.ylabel('AUC'), plt.ylim(0, 1)
     plt.show()
-
-    ttest = scipy.stats.ttest_rel(raw_aucs, binned_aucs)
-    print('T-test pred-value:', ttest[1])
