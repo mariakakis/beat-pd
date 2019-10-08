@@ -1,4 +1,3 @@
-import pandas as pd
 from settings import *
 from training_helper import train_user_model
 from joblib import Parallel, delayed
@@ -18,12 +17,13 @@ Data['tremor'] = Data.ID.apply(lambda x: Meta.loc[x, 'tremor'])
 print('Done processing data')
 
 # Train for each label
-model_types = [RANDOM_FOREST, XGBOOST, ORDINAL]
+model_types = [ORDINAL_RANDOM_FOREST, ORDINAL, RANDOM_FOREST, XGBOOST]
 label_names = ['on_off', 'dyskinesia', 'tremor']
 if not RUN_PARALLEL:
     for model_type in model_types:
         for label_name in label_names:
             train_user_model(Data, label_name, model_type)
+            break
 else:
     combinations = list(itertools.product(model_types, label_names))
     Parallel(n_jobs=2)(delayed(train_user_model)(Data, label_name, model_type)

@@ -1,72 +1,50 @@
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, GridSearchCV
-from sklearn.pipeline import Pipeline
 from sklearn.metrics import confusion_matrix, roc_auc_score, mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import label_binarize
 import mord
-import matplotlib.pyplot as plt
-import numpy as np
-import seaborn as sns
+from ordinal_model import OrdinalClassifier
 import xgboost as xgb
-import pandas as pd
-import scipy
 import scipy.stats
+from sklearn.pipeline import Pipeline
 from settings import *
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
-def print_debug(text):
-    if DEBUG:
-        print(text)
-
-
-def compute_mean_ci(x):
-    mean_x = np.mean(x)
-    stderr_x = scipy.stats.sem(x)
-    # ci = (mean_x-1.98*stderr_x, mean_x+1.98*stderr_x)
-    return mean_x, stderr_x
-
-
-def plot_confusion(gts, preds, title):
-    lab = sorted(np.unique(gts))
-    cmat = confusion_matrix(gts, preds, labels=lab)
-    # norm_cmat = cmat/np.sum(cmat, axis=1).reshape([-1, 1])
-    plt.figure()
-    plt.title(title)
-    sns.heatmap(cmat, annot=True, fmt='d')
-    plt.xlabel('Ground Truth'), plt.ylabel('Prediction')
-    plt.show()
-
-
-def train_user_model(Data, label_name, model_type):
+def train_user_model(data, label_name, model_type):
     print('Model:', model_type, ', Label:', label_name)
     ground_truths, preds = np.array([]), np.array([])
     data_quantity = pd.DataFrame(columns=['subject_id', 'samples'])
-    scores = pd.DataFrame(columns=['subject_id', 'AUC', 'MSE', 'MAE'])
-    sorted_subjects = sorted(Data.subject_id.unique())
-    for subject in sorted_subjects:
+    scores = pd.DataFrame(columns=['subject_id', 'AUC', 'MSE', 'MAE', 'MSE_gain', 'MAE_gain'])
+    sorted_subjects = sorted(data.subject_id.unique())
+    for subject in sorted_subjects[:3]:
         print_debug('--------------')
         print('Subject: %s' % subject)
 
         # Get data belonging to a specific subject
-        subj_data = Data[Data.subject_id == subject].copy()
+        subj_data = data[data.subject_id == subject].copy()
         subj_data.sort_values(by='timestamp', inplace=True)
 
         # Remove cases where on_off is not labeled
         subj_data = subj_data[subj_data.on_off > -1]
-        data_quantity = data_quantity.append({'subject_id': subject, 'samples': len(subj_data)}, ignore_index=True)
 
         # Make a table that just has unique measurement_ids and labels for the user
         id_table = subj_data[['ID', label_name]].drop_duplicates()
+        data_quantity = data_quantity.append({'subject_id': subject, 'samples': len(id_table)}, ignore_index=True)
 
-        # Make sure there's enough data for analysis
-        if len(id_table) <= MIN_POINTS_PER_SUBJECT:
+        # Remove any classes with not enough samples
+        label_counts = id_table[label_name].value_counts()
+        for i in range(len(label_counts)):
+            if i in label_counts and label_counts[i] <= MIN_OBSERVATIONS_PER_CLASS:
+                subj_data = subj_data[subj_data[label_name] != i]
+                id_table = id_table[id_table[label_name] != i]
+                print_debug('Removing class %d from this user' % i)
+
+        # Skip if not enough data left over
+        if len(id_table) <= MIN_OBSERVATIONS_PER_SUBJECT:
             print_debug('Not enough data points for that subject')
-            continue
-        if min(id_table[label_name].value_counts()) <= MIN_POINTS_PER_CLASS:
-            print_debug('Not enough data points for a class with that subject')
             continue
 
         rskf = RepeatedStratifiedKFold(n_splits=NUM_STRATIFIED_FOLDS, n_repeats=NUM_STRATIFIED_ROUNDS, random_state=RANDOM_SEED)
@@ -102,7 +80,6 @@ def train_user_model(Data, label_name, model_type):
                 continue
 
             # Pick the correct model
-            # TODO: add regression?
             if model_type == RANDOM_FOREST:
                 model = RandomForestClassifier(random_state=RANDOM_SEED)
                 param_grid = dict(regression__n_estimators=np.arange(10, 51, 10))
@@ -110,9 +87,17 @@ def train_user_model(Data, label_name, model_type):
                 model = xgb.XGBClassifier(objective="multi:softprob", random_state=RANDOM_SEED)
                 model.set_params(**{'num_class': len(train_classes)})
                 param_grid = dict(regression__n_estimators=np.arange(80, 121, 20))
+            elif model_type == ORDINAL_RANDOM_FOREST:
+                model = RandomForestClassifier(random_state=RANDOM_SEED)
+                param_grid = dict(regression__n_estimators=np.arange(10, 51, 10))
             elif model_type == ORDINAL:
                 model = mord.LogisticSE()
                 param_grid = dict(regression__alpha=np.arange(1, 6, 1))
+                missing_class = any([k != train_classes[k] for k in range(len(train_classes))])
+                if missing_class:
+                    # TODO: map classes?
+                    print_debug('Missing a class, what should we do?')
+                    continue
             else:
                 raise Exception('Not a valid model type')
 
@@ -142,7 +127,6 @@ def train_user_model(Data, label_name, model_type):
             #                    % (model_type, label_name, subject))
 
             # Bin probabilities over each diary entry
-            # TODO: what does this do?
             probs_bin = []
             y_test_bin = []
             pred_bin = []
@@ -166,9 +150,17 @@ def train_user_model(Data, label_name, model_type):
                     y_test_binary = np.delete(y_test_binary, i, axis=1)
                     y_test_bin_binary = np.delete(y_test_bin_binary, i, axis=1)
 
-            # Calculate MSE and MAE
+            # Calculate MSE/MAE
             mse = mean_squared_error(y_test_bin, pred_bin)
             mae = mean_absolute_error(y_test_bin, pred_bin)
+
+            # Compute null model MSE/MAE
+            null_model_mse = mean_squared_error(np.ones(pred_bin.shape)*np.mean(y_train), pred_bin)
+            null_model_mae = mean_absolute_error(np.ones(pred_bin.shape)*np.median(y_train), pred_bin)
+
+            # Calculate MSE/MAE gain
+            mse_gain = mse-null_model_mse
+            mae_gain = mae-null_model_mae
 
             # Calculate AUCs
             if len(lab) > 2:
@@ -178,7 +170,9 @@ def train_user_model(Data, label_name, model_type):
             print_debug('AUC: %0.2f' % auc)
 
             # Add scores
-            scores = scores.append({'subject_id': subject, 'AUC': auc, 'MSE': mse, 'MAE': mae},
+            scores = scores.append({'subject_id': subject, 'AUC': auc,
+                                    'MSE': mse, 'MAE': mae,
+                                    'MSE_gain': mse_gain, 'MAE_gain': mae_gain},
                                    ignore_index=True)
 
     # Compute means and CIs
@@ -186,10 +180,16 @@ def train_user_model(Data, label_name, model_type):
     mse_mean, mse_stderr = compute_mean_ci(scores.MSE)
     mae_mean, mae_stderr = compute_mean_ci(scores.MAE)
 
-    # Create title
-    title = 'Model: %s, Label: %s\n' % (model_type, label_name)
-    title += 'AUC = %0.2f±%0.2f\n' % (auc_mean, auc_stderr)
-    title += 'MSE = %0.2f±%0.2f, MAE = %0.2f±%0.2f' % (mse_mean, mse_stderr, mae_mean, mae_stderr)
+    # Stack MSE/MAE for second plot
+    scores_plot = scores.copy()
+    scores_plot = scores_plot.melt(id_vars='subject_id', value_vars=["MSE_gain", "MAE_gain"])
+
+    # Create titles
+    title1 = 'Model: %s, Label: %s\n' % (model_type, label_name)
+    title1 += 'AUC = %0.2f±%0.2f' % (auc_mean, auc_stderr)
+
+    title2 = 'Model: %s, Label: %s\n' % (model_type, label_name)
+    title2 += 'MSE = %0.2f±%0.2f, MAE = %0.2f±%0.2f' % (mse_mean, mse_stderr, mae_mean, mae_stderr)
 
     # Create x-ticks
     x_ticks = ['%d (%d)' % (subj, quant) for subj, quant in zip(data_quantity.subject_id.values, data_quantity.samples.values)
@@ -198,12 +198,43 @@ def train_user_model(Data, label_name, model_type):
     # Plot boxplot of AUCs
     sns.set(style="whitegrid")
     fig = plt.figure()
-    ax = fig.add_subplot(111)
+    ax = fig.add_subplot(121)
     sns.boxplot(x='subject_id', y='AUC', data=scores)
-    plt.title(title)
+    plt.title(title1)
     plt.axhline(0.5, 0, len(sorted_subjects), color='k', linestyle='--')
     ax.set_xticklabels(x_ticks), plt.setp(ax.xaxis.get_majorticklabels(), rotation=90)
     plt.xlabel('Subject ID (#samples)')
     plt.ylabel('AUC'), plt.ylim(0, 1)
+
+    ax = fig.add_subplot(122)
+    sns.boxplot(x='subject_id', y='value', data=scores_plot, hue='variable')
+    plt.title(title2)
+    ax.set_xticklabels(x_ticks), plt.setp(ax.xaxis.get_majorticklabels(), rotation=90)
+    plt.xlabel('Subject ID (#samples)'), plt.ylabel('Gain')
+
+    plt.savefig(os.path.join('figs', '%s_%s.png' % (model_type, label_name)), bbox_inches='tight')
     plt.show()
     print('**********************')
+
+
+def print_debug(text):
+    if DEBUG:
+        print(text)
+
+
+def compute_mean_ci(x):
+    mean_x = np.mean(x)
+    stderr_x = scipy.stats.sem(x)
+    # ci = (mean_x-1.98*stderr_x, mean_x+1.98*stderr_x)
+    return mean_x, stderr_x
+
+
+def plot_confusion(gts, preds, title):
+    lab = sorted(np.unique(gts))
+    cmat = confusion_matrix(gts, preds, labels=lab)
+    # norm_cmat = cmat/np.sum(cmat, axis=1).reshape([-1, 1])
+    plt.figure()
+    plt.title(title)
+    sns.heatmap(cmat, annot=True, fmt='d')
+    plt.xlabel('Ground Truth'), plt.ylabel('Prediction')
+    plt.show()
