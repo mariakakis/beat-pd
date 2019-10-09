@@ -73,6 +73,8 @@ def train_user_model(data, label_name, model_type):
             y_train = subj_data_train[label_name].values
             y_test = subj_data_test[label_name].values
             train_classes, test_classes = np.unique(y_train), np.unique(y_test)
+            y_train = y_train.astype(np.int)
+            y_test = y_test.astype(np.int)
 
             # Make sure that folds don't cut the data in a weird way
             if len(train_classes) <= 1:
