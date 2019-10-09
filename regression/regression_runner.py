@@ -23,6 +23,6 @@ if not RUN_PARALLEL:
         for label_name in label_names:
             train_user_model(Data, label_name, model_type)
 else:
-    combinations = list(itertools.product(REGRESSORS, label_names))
+    combinations = list(itertools.product(label_names, REGRESSORS))
     Parallel(n_jobs=2)(delayed(train_user_model)(Data, label_name, model_type)
                        for (label_name, model_type) in combinations)
