@@ -1,12 +1,11 @@
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, GridSearchCV
-from sklearn.metrics import confusion_matrix, roc_auc_score, mean_absolute_error, mean_squared_error
+from sklearn.metrics import roc_auc_score, mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import label_binarize
 import mord
-from ordinal_model import OrdinalClassifier
+from classification.ordinal_models.ordinal_rf import OrdinalRandomForestClassifier
 import xgboost as xgb
 import scipy.stats
-from sklearn.pipeline import Pipeline
 from settings import *
 
 import warnings
@@ -15,11 +14,17 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def train_user_model(data, label_name, model_type):
     print('Model:', model_type, ', Label:', label_name)
+    filename = os.path.join('../figs', '%s_%s.png' % (model_type, label_name))
+    if os.path.exists(filename):
+        return
+
     ground_truths, preds = np.array([]), np.array([])
     data_quantity = pd.DataFrame(columns=['subject_id', 'samples'])
-    scores = pd.DataFrame(columns=['subject_id', 'AUC', 'MSE', 'MAE', 'MSE_gain', 'MAE_gain'])
+    scores = pd.DataFrame(columns=['subject_id', 'AUC',
+                                   'MSE', 'MAE', 'MSE_gain', 'MAE_gain',
+                                   'Macro_MSE', 'Macro_MAE', 'Macro_MSE_gain', 'Macro_MAE_gain'])
     sorted_subjects = sorted(data.subject_id.unique())
-    for subject in sorted_subjects[:3]:
+    for subject in sorted_subjects[:2]:
         print_debug('--------------')
         print('Subject: %s' % subject)
 
@@ -80,51 +85,51 @@ def train_user_model(data, label_name, model_type):
                 continue
 
             # Pick the correct model
-            if model_type == RANDOM_FOREST:
+            missing_class = any([k != train_classes[k] for k in range(len(train_classes))])
+            if model_type == CLASSIF_RANDOM_FOREST:
                 model = RandomForestClassifier(random_state=RANDOM_SEED)
-                param_grid = dict(regression__n_estimators=np.arange(10, 51, 10))
-            elif model_type == XGBOOST:
+                param_grid = dict(n_estimators=np.arange(10, 51, 10))
+            elif model_type == CLASSIF_XGBOOST:
                 model = xgb.XGBClassifier(objective="multi:softprob", random_state=RANDOM_SEED)
                 model.set_params(**{'num_class': len(train_classes)})
-                param_grid = dict(regression__n_estimators=np.arange(80, 121, 20))
-            elif model_type == ORDINAL_RANDOM_FOREST:
-                model = RandomForestClassifier(random_state=RANDOM_SEED)
-                param_grid = dict(regression__n_estimators=np.arange(10, 51, 10))
-            elif model_type == ORDINAL:
+                param_grid = dict(n_estimators=np.arange(80, 121, 20))
+            elif model_type == CLASSIF_ORDINAL_RANDOM_FOREST:
+                model = OrdinalRandomForestClassifier(random_state=RANDOM_SEED)
+                param_grid = dict(n_estimators=np.arange(10, 51, 10))
+            elif model_type == CLASSIF_ORDINAL_LOGISTIC:
                 model = mord.LogisticSE()
-                param_grid = dict(regression__alpha=np.arange(1, 6, 1))
-                missing_class = any([k != train_classes[k] for k in range(len(train_classes))])
+                param_grid = dict(alpha=np.logspace(0, 3, 1))
+
+                # Remap classes to fill in gap if one exists
                 if missing_class:
-                    # TODO: map classes?
-                    print_debug('Missing a class, what should we do?')
-                    continue
+                    print_debug('Forced to remap labels')
+                    y_train = np.array(list(map(lambda x: np.where(train_classes == x), y_train))).flatten()
             else:
                 raise Exception('Not a valid model type')
 
             # Identify ideal parameters using stratified k-fold cross-validation
             cross_validator = StratifiedKFold(n_splits=PARAM_SEARCH_FOLDS, random_state=RANDOM_SEED)
-            pipeline = Pipeline([
-                ('regression', model)
-            ])
-            grid_search = GridSearchCV(pipeline, param_grid=param_grid, cv=cross_validator)
+            grid_search = GridSearchCV(model, param_grid=param_grid, cv=cross_validator)
             grid_search.fit(x_train, y_train)
-            model = pipeline.set_params(**grid_search.best_params_)
+            model.set_params(**grid_search.best_params_)
             print_debug('Done cross-validating')
 
             # Fit the model and predict classes
             model.fit(x_train, y_train)
             pred = model.predict(x_test)
             probs = model.predict_proba(x_test)
-            lab = model.classes_
+            lab = train_classes
+
+            # If doing ordinal logistic regression, map classes back
+            if model_type == CLASSIF_ORDINAL_LOGISTIC and missing_class:
+                pred = np.array(list(map(lambda x: train_classes[x], pred))).flatten()
+                new_probs = np.zeros(shape=(probs.shape[0], np.max(train_classes)+1))
+                for c in train_classes:
+                    new_probs[:, c] = probs[:, np.where(train_classes == c)].flatten()
 
             # Concatenate results
             ground_truths = np.concatenate([ground_truths, y_test])
             preds = np.concatenate([preds, pred])
-
-            # Show subject confusion matrix
-            # if DEBUG:
-            #     plot_confusion(y_test, pred, 'Model: %s, Label: %s\nSubject: %s'
-            #                    % (model_type, label_name, subject))
 
             # Bin probabilities over each diary entry
             probs_bin = []
@@ -154,13 +159,31 @@ def train_user_model(data, label_name, model_type):
             mse = mean_squared_error(y_test_bin, pred_bin)
             mae = mean_absolute_error(y_test_bin, pred_bin)
 
-            # Compute null model MSE/MAE
-            null_model_mse = mean_squared_error(np.ones(pred_bin.shape)*np.mean(y_train), pred_bin)
-            null_model_mae = mean_absolute_error(np.ones(pred_bin.shape)*np.median(y_train), pred_bin)
+            # Compute null model MSE/MAE and the gain
+            mse_trivial = np.ones(pred_bin.shape) * np.mean(y_train)
+            mae_trivial = np.ones(pred_bin.shape) * np.median(y_train)
+            null_model_mse = mean_squared_error(y_test_bin, mse_trivial)
+            null_model_mae = mean_absolute_error(y_test_bin, mae_trivial)
+            mse_gain = mse - null_model_mse
+            mae_gain = mae - null_model_mae
 
-            # Calculate MSE/MAE gain
-            mse_gain = mse-null_model_mse
-            mae_gain = mae-null_model_mae
+            # Compute macro-MSE/MAE
+            macro_mse, macro_mae = 0, 0
+            for c in train_classes:
+                idxs = np.where(y_test_bin == c)
+                macro_mse += mean_squared_error(y_test_bin[idxs], pred_bin[idxs])/len(train_classes)
+                macro_mae += mean_absolute_error(y_test_bin[idxs], pred_bin[idxs])/len(train_classes)
+
+            # Compute null model macro-MSE/macro-MAE and the gain
+            null_model_macro_mse, null_model_macro_mae = 0, 0
+            macro_mse_trivial = np.ones(pred_bin.shape) * np.mean(train_classes)
+            macro_mae_trivial = np.ones(pred_bin.shape) * np.median(train_classes)
+            for c in train_classes:
+                idxs = np.where(y_test_bin == c)
+                null_model_macro_mse += mean_squared_error(y_test_bin[idxs], macro_mse_trivial[idxs]) / len(train_classes)
+                null_model_macro_mae += mean_absolute_error(y_test_bin[idxs], macro_mae_trivial[idxs]) / len(train_classes)
+            macro_mse_gain = macro_mse - null_model_macro_mse
+            macro_mae_gain = macro_mae - null_model_macro_mae
 
             # Calculate AUCs
             if len(lab) > 2:
@@ -172,24 +195,52 @@ def train_user_model(data, label_name, model_type):
             # Add scores
             scores = scores.append({'subject_id': subject, 'AUC': auc,
                                     'MSE': mse, 'MAE': mae,
-                                    'MSE_gain': mse_gain, 'MAE_gain': mae_gain},
+                                    'MSE_gain': mse_gain, 'MAE_gain': mae_gain,
+                                    'Macro_MSE': macro_mse, 'Macro_MAE': macro_mae,
+                                    'Macro_MSE_gain': macro_mse_gain, 'Macro_MAE_gain': macro_mae_gain},
                                    ignore_index=True)
 
     # Compute means and CIs
     auc_mean, auc_stderr = compute_mean_ci(scores.AUC)
     mse_mean, mse_stderr = compute_mean_ci(scores.MSE)
     mae_mean, mae_stderr = compute_mean_ci(scores.MAE)
+    macro_mse_mean, macro_mse_stderr = compute_mean_ci(scores.Macro_MSE)
+    macro_mae_mean, macro_mae_stderr = compute_mean_ci(scores.Macro_MAE)
+    mse_gain_mean, mse_gain_stderr = compute_mean_ci(scores.MSE_gain)
+    mae_gain_mean, mae_gain_stderr = compute_mean_ci(scores.MAE_gain)
+    macro_mse_gain_mean, macro_mse_gain_stderr = compute_mean_ci(scores.Macro_MSE_gain)
+    macro_mae_gain_mean, macro_mae_gain_stderr = compute_mean_ci(scores.Macro_MAE_gain)
 
-    # Stack MSE/MAE for second plot
+    # Stack MSE/MAE for second plot 
     scores_plot = scores.copy()
-    scores_plot = scores_plot.melt(id_vars='subject_id', value_vars=["MSE_gain", "MAE_gain"])
+    scores_plot = scores_plot.melt(id_vars='subject_id',
+                                   value_vars=["MSE_gain", "MAE_gain", "Macro_MSE_gain", "Macro_MAE_gain"])
+    scores_plot = scores_plot.replace("MSE_gain", "MSE")
+    scores_plot = scores_plot.replace("MAE_gain", "MAE")
+    scores_plot = scores_plot.replace("Macro_MSE_gain", "Macro_MSE")
+    scores_plot = scores_plot.replace("Macro_MAE_gain", "Macro_MAE")
 
     # Create titles
     title1 = 'Model: %s, Label: %s\n' % (model_type, label_name)
     title1 += 'AUC = %0.2f±%0.2f' % (auc_mean, auc_stderr)
 
     title2 = 'Model: %s, Label: %s\n' % (model_type, label_name)
-    title2 += 'MSE = %0.2f±%0.2f, MAE = %0.2f±%0.2f' % (mse_mean, mse_stderr, mae_mean, mae_stderr)
+    title2 += 'MSE = %0.2f±%0.2f, ' \
+              'MAE = %0.2f±%0.2f' % \
+              (mse_mean, mse_stderr,
+               mae_mean, mae_stderr)
+    title2 += 'Macro MSE = %0.2f±%0.2f, ' \
+              'Macro MAE = %0.2f±%0.2f\n' % \
+              (macro_mse_mean, macro_mse_stderr,
+               macro_mae_mean, macro_mae_stderr)
+    title2 += 'MSE Gain = %0.2f±%0.2f, ' \
+              'MAE Gain = %0.2f±%0.2f' % \
+              (mse_gain_mean, mse_gain_stderr,
+               mae_gain_mean, mae_gain_stderr)
+    title2 += 'Macro MSE Gain = %0.2f±%0.2f, ' \
+              'Macro MAE Gain = %0.2f±%0.2f\n' % \
+              (macro_mse_gain_mean, macro_mse_gain_stderr,
+               macro_mae_gain_mean, macro_mae_gain_stderr)
 
     # Create x-ticks
     x_ticks = ['%d (%d)' % (subj, quant) for subj, quant in zip(data_quantity.subject_id.values, data_quantity.samples.values)
@@ -197,22 +248,27 @@ def train_user_model(data, label_name, model_type):
 
     # Plot boxplot of AUCs
     sns.set(style="whitegrid")
-    fig = plt.figure()
-    ax = fig.add_subplot(121)
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(211)
     sns.boxplot(x='subject_id', y='AUC', data=scores)
-    plt.title(title1)
     plt.axhline(0.5, 0, len(sorted_subjects), color='k', linestyle='--')
+    plt.title(title1)
     ax.set_xticklabels(x_ticks), plt.setp(ax.xaxis.get_majorticklabels(), rotation=90)
     plt.xlabel('Subject ID (#samples)')
     plt.ylabel('AUC'), plt.ylim(0, 1)
+    for x in np.arange(0, len(sorted_subjects), 1):
+        plt.axvline(x+0.5, -100, 100, color='k', linestyle='--')
 
-    ax = fig.add_subplot(122)
+    ax = fig.add_subplot(212)
     sns.boxplot(x='subject_id', y='value', data=scores_plot, hue='variable')
+    plt.axhline(0, 0, len(sorted_subjects), color='k', linestyle='--')
     plt.title(title2)
     ax.set_xticklabels(x_ticks), plt.setp(ax.xaxis.get_majorticklabels(), rotation=90)
-    plt.xlabel('Subject ID (#samples)'), plt.ylabel('Gain')
+    plt.xlabel('Subject ID (#samples)'), plt.ylabel('Gain (Model - Null)')
+    for x in np.arange(0, len(sorted_subjects), 1):
+        plt.axvline(x+0.5, -100, 100, color='k', linestyle='--')
 
-    plt.savefig(os.path.join('figs', '%s_%s.png' % (model_type, label_name)), bbox_inches='tight')
+    plt.savefig(filename, bbox_inches='tight')
     plt.show()
     print('**********************')
 
@@ -227,14 +283,3 @@ def compute_mean_ci(x):
     stderr_x = scipy.stats.sem(x)
     # ci = (mean_x-1.98*stderr_x, mean_x+1.98*stderr_x)
     return mean_x, stderr_x
-
-
-def plot_confusion(gts, preds, title):
-    lab = sorted(np.unique(gts))
-    cmat = confusion_matrix(gts, preds, labels=lab)
-    # norm_cmat = cmat/np.sum(cmat, axis=1).reshape([-1, 1])
-    plt.figure()
-    plt.title(title)
-    sns.heatmap(cmat, annot=True, fmt='d')
-    plt.xlabel('Ground Truth'), plt.ylabel('Prediction')
-    plt.show()
