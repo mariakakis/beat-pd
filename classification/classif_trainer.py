@@ -25,7 +25,7 @@ def train_user_model(data, label_name, model_type):
                                    'MSE', 'MAE', 'MSE_gain', 'MAE_gain',
                                    'Macro_MSE', 'Macro_MAE', 'Macro_MSE_gain', 'Macro_MAE_gain'])
     sorted_subjects = sorted(data.subject_id.unique())
-    for subject in sorted_subjects[:2]:
+    for subject in sorted_subjects:
         print_debug('--------------')
         print('Subject: %s' % subject)
 
