@@ -1,4 +1,5 @@
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, GridSearchCV
 from sklearn.metrics import roc_auc_score, mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import label_binarize
@@ -14,7 +15,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def train_user_model(data, label_name, model_type):
     print('Model:', model_type, ', Label:', label_name)
-    filename = os.path.join('../figs', '%s_%s.png' % (model_type, label_name))
+    filename = os.path.join('../figs/classification', '%s_%s.png' % (model_type, label_name))
     if os.path.exists(filename):
         return
 
@@ -104,6 +105,11 @@ def train_user_model(data, label_name, model_type):
                 if missing_class:
                     print_debug('Forced to remap labels')
                     y_train = np.array(list(map(lambda x: np.where(train_classes == x), y_train))).flatten()
+            elif model_type == CLASSIF_MLP:
+                model = MLPClassifier(max_iter=1e3, random_state=RANDOM_SEED)
+                num_features = x_train.shape[1]
+                half_x, quart_x = int(num_features/2), int(num_features/4)
+                param_grid = dict(hidden_layer_sizes=[(half_x), (half_x, quart_x)])
             else:
                 raise Exception('Not a valid model type')
 

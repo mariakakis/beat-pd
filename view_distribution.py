@@ -98,5 +98,5 @@ for label_name in ['on_off', 'dyskinesia', 'tremor']:
     plt.xticks(ind, sorted_subjects), plt.setp(ax.xaxis.get_majorticklabels(), rotation=90)
     plt.xlabel('Subject ID'), plt.ylabel('Normalized Count Pre Filtering')
 
-    plt.savefig(os.path.join('figs', 'distribution_%s.png' % label_name), bbox_inches='tight')
+    plt.savefig(os.path.join('figs', 'distributions', '%s.png' % label_name), bbox_inches='tight')
     plt.show()

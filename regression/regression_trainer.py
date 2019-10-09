@@ -1,5 +1,6 @@
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, GridSearchCV
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import label_binarize
 import xgboost as xgb
 import scipy.stats
@@ -11,7 +12,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def train_user_model(data, label_name, model_type):
     print('Model:', model_type, ', Label:', label_name)
-    filename = os.path.join('../figs', '%s_%s.png' % (model_type, label_name))
+    filename = os.path.join('../figs/regression', '%s_%s.png' % (model_type, label_name))
     if os.path.exists(filename):
         return
 
@@ -82,36 +83,26 @@ def train_user_model(data, label_name, model_type):
                 continue
 
             # Pick the correct model
-            if model_type == RANK_XGBOOST:
-                model = xgb.XGBRanker(random_state=RANDOM_SEED)
-                model.set_params(**{'num_class': len(train_classes)})
+            if model_type == REGRESS_XGBOOST:
+                model = xgb.XGBRegressor(objective="reg:squarederror", random_state=RANDOM_SEED)
                 param_grid = dict(n_estimators=np.arange(80, 121, 20))
-
-                # Calculate groups param and sort by label
-                train_values = subj_data_train[label_name].value_counts()
-                group = np.zeros((np.max(train_classes)+1,), dtype=np.int)
-                for i in range(len(train_values)):
-                    if i in train_values:
-                        group[i] = train_values[i]
-                sorted_idxs = y_train.argsort()
-                x_train = x_train[sorted_idxs]
-                y_train = y_train[sorted_idxs]
-                print(len(y_train))
-                print(np.sum(group))
-                # cross_val_group = (group*(PARAM_SEARCH_FOLDS-1)/PARAM_SEARCH_FOLDS).astype(np.int)
+            elif model_type == REGRESS_MLP:
+                model = MLPRegressor(max_iter=1e3, random_state=RANDOM_SEED)
+                num_features = x_train.shape[1]
+                half_x, quart_x = int(num_features / 2), int(num_features / 4)
+                param_grid = dict(hidden_layer_sizes=[(half_x), (half_x, quart_x)])
             else:
                 raise Exception('Not a valid model type')
 
             # Identify ideal parameters using stratified k-fold cross-validation
-            # TODO: easy way to cross_validate XGBOOST Ranker?
-            # cross_validator = StratifiedKFold(n_splits=PARAM_SEARCH_FOLDS, random_state=RANDOM_SEED)
-            # grid_search = GridSearchCV(model, param_grid=param_grid, cv=cross_validator, scoring='accuracy')
-            # grid_search.fit(x_train, y_train, group=cross_val_group)
-            # model.set_params(**grid_search.best_params_)
-            # print_debug('Done cross-validating')
+            cross_validator = StratifiedKFold(n_splits=PARAM_SEARCH_FOLDS, random_state=RANDOM_SEED)
+            grid_search = GridSearchCV(model, param_grid=param_grid, cv=cross_validator)
+            grid_search.fit(x_train, y_train)
+            model.set_params(**grid_search.best_params_)
+            print_debug('Done cross-validating')
 
             # Fit the model and predict classes
-            model.fit(x_train, y_train, group=group) # TODO: do all rankers need group?
+            model.fit(x_train, y_train)
             pred = model.predict(x_test)
             lab = train_classes
 

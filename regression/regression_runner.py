@@ -1,5 +1,5 @@
 from settings import *
-from ranking.ranking_trainer import train_user_model
+from regression.regression_trainer import train_user_model
 from joblib import Parallel, delayed
 import itertools
 
@@ -19,10 +19,10 @@ print('Done processing data')
 # Train for each label
 label_names = ['on_off', 'dyskinesia', 'tremor']
 if not RUN_PARALLEL:
-    for model_type in RANKERS:
+    for model_type in REGRESSORS:
         for label_name in label_names:
             train_user_model(Data, label_name, model_type)
 else:
-    combinations = list(itertools.product(RANKERS, label_names))
+    combinations = list(itertools.product(REGRESSORS, label_names))
     Parallel(n_jobs=2)(delayed(train_user_model)(Data, label_name, model_type)
                        for (label_name, model_type) in combinations)
