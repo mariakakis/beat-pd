@@ -24,5 +24,5 @@ if not RUN_PARALLEL:
             train_user_model(Data, label_name, model_type)
 else:
     combinations = list(itertools.product(label_names, CLASSIFIERS))
-    Parallel(n_jobs=2)(delayed(train_user_model)(Data, label_name, model_type)
+    Parallel(n_jobs=NUM_THREADS)(delayed(train_user_model)(Data, label_name, model_type)
                        for (label_name, model_type) in combinations)
