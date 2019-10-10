@@ -12,7 +12,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def train_user_model(data, label_name, model_type):
     print('Model:', model_type, ', Label:', label_name)
-    filename = os.path.join('../figs/regression', '%s_%s.png' % (model_type, label_name))
+    filename = os.path.join(HOME_DIRECTORY, 'figs', 'regression', '%s_%s.png' % (model_type, label_name))
     if os.path.exists(filename):
         return
 
@@ -99,7 +99,7 @@ def train_user_model(data, label_name, model_type):
             grid_search = GridSearchCV(model, param_grid=param_grid, cv=cross_validator)
             grid_search.fit(x_train, y_train)
             model.set_params(**grid_search.best_params_)
-            print_debug('Done cross-validating')
+            print('Best params:', **grid_search.best_params_)
 
             # Fit the model and predict classes
             model.fit(x_train, y_train)
@@ -189,7 +189,7 @@ def train_user_model(data, label_name, model_type):
     # Create titles
     title = 'Model: %s, Label: %s\n' % (model_type, label_name)
     title += 'MSE = %0.2f±%0.2f, ' \
-              'MAE = %0.2f±%0.2f' % \
+              'MAE = %0.2f±%0.2f, ' % \
               (mse_mean, mse_stderr,
                mae_mean, mae_stderr)
     title += 'Macro MSE = %0.2f±%0.2f, ' \
@@ -197,11 +197,11 @@ def train_user_model(data, label_name, model_type):
               (macro_mse_mean, macro_mse_stderr,
                macro_mae_mean, macro_mae_stderr)
     title += 'MSE Gain = %0.2f±%0.2f, ' \
-              'MAE Gain = %0.2f±%0.2f' % \
+              'MAE Gain = %0.2f±%0.2f, ' % \
               (mse_gain_mean, mse_gain_stderr,
                mae_gain_mean, mae_gain_stderr)
     title += 'Macro MSE Gain = %0.2f±%0.2f, ' \
-              'Macro MAE Gain = %0.2f±%0.2f\n' % \
+              'Macro MAE Gain = %0.2f±%0.2f' % \
               (macro_mse_gain_mean, macro_mse_gain_stderr,
                macro_mae_gain_mean, macro_mae_gain_stderr)
 

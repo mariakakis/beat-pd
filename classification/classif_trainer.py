@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def train_user_model(data, label_name, model_type):
     print('Model:', model_type, ', Label:', label_name)
-    filename = os.path.join('../figs/classification', '%s_%s.png' % (model_type, label_name))
+    filename = os.path.join(HOME_DIRECTORY, 'figs', 'classification', '%s_%s.png' % (model_type, label_name))
     if os.path.exists(filename):
         return
 
@@ -102,11 +102,6 @@ def train_user_model(data, label_name, model_type):
             elif model_type == CLASSIF_ORDINAL_LOGISTIC:
                 model = mord.LogisticSE()
                 param_grid = dict(alpha=np.logspace(0, 3, 1))
-
-                # Remap classes to fill in gap if one exists
-                if missing_class:
-                    print_debug('Forced to remap labels')
-                    y_train = np.array(list(map(lambda x: np.where(train_classes == x), y_train))).flatten()
             elif model_type == CLASSIF_MLP:
                 model = MLPClassifier(max_iter=1000, random_state=RANDOM_SEED)
                 num_features = x_train.shape[1]
@@ -115,12 +110,18 @@ def train_user_model(data, label_name, model_type):
             else:
                 raise Exception('Not a valid model type')
 
+            # Remap classes to fill in gap if one exists
+            if model_type in (CLASSIF_ORDINAL_RANDOM_FOREST, CLASSIF_ORDINAL_LOGISTIC) \
+                    and missing_class:
+                print_debug('Forced to remap labels')
+                y_train = np.array(list(map(lambda x: np.where(train_classes == x), y_train))).flatten()
+
             # Identify ideal parameters using stratified k-fold cross-validation
             cross_validator = StratifiedKFold(n_splits=PARAM_SEARCH_FOLDS, random_state=RANDOM_SEED)
             grid_search = GridSearchCV(model, param_grid=param_grid, cv=cross_validator)
             grid_search.fit(x_train, y_train)
             model.set_params(**grid_search.best_params_)
-            print_debug('Done cross-validating')
+            print('Best params:', **grid_search.best_params_)
 
             # Fit the model and predict classes
             model.fit(x_train, y_train)
@@ -129,7 +130,8 @@ def train_user_model(data, label_name, model_type):
             lab = train_classes
 
             # If doing ordinal logistic regression, map classes back
-            if model_type == CLASSIF_ORDINAL_LOGISTIC and missing_class:
+            if model_type in (CLASSIF_ORDINAL_RANDOM_FOREST, CLASSIF_ORDINAL_LOGISTIC) \
+                    and missing_class:
                 pred = np.array(list(map(lambda x: train_classes[x], pred))).flatten()
                 new_probs = np.zeros(shape=(probs.shape[0], np.max(train_classes)+1))
                 for c in train_classes:
@@ -234,7 +236,7 @@ def train_user_model(data, label_name, model_type):
 
     title2 = 'Model: %s, Label: %s\n' % (model_type, label_name)
     title2 += 'MSE = %0.2f±%0.2f, ' \
-              'MAE = %0.2f±%0.2f' % \
+              'MAE = %0.2f±%0.2f, ' % \
               (mse_mean, mse_stderr,
                mae_mean, mae_stderr)
     title2 += 'Macro MSE = %0.2f±%0.2f, ' \
@@ -242,11 +244,11 @@ def train_user_model(data, label_name, model_type):
               (macro_mse_mean, macro_mse_stderr,
                macro_mae_mean, macro_mae_stderr)
     title2 += 'MSE Gain = %0.2f±%0.2f, ' \
-              'MAE Gain = %0.2f±%0.2f' % \
+              'MAE Gain = %0.2f±%0.2f, ' % \
               (mse_gain_mean, mse_gain_stderr,
                mae_gain_mean, mae_gain_stderr)
     title2 += 'Macro MSE Gain = %0.2f±%0.2f, ' \
-              'Macro MAE Gain = %0.2f±%0.2f\n' % \
+              'Macro MAE Gain = %0.2f±%0.2f' % \
               (macro_mse_gain_mean, macro_mse_gain_stderr,
                macro_mae_gain_mean, macro_mae_gain_stderr)
 
@@ -256,13 +258,14 @@ def train_user_model(data, label_name, model_type):
 
     # Plot boxplot of AUCs
     sns.set(style="whitegrid")
-    fig = plt.figure(figsize=(10, 10))
+    fig = plt.figure(figsize=(10, 15))
     ax = fig.add_subplot(211)
     sns.boxplot(x='subject_id', y='AUC', data=scores)
     plt.axhline(0.5, 0, len(sorted_subjects), color='k', linestyle='--')
     plt.title(title1)
-    ax.set_xticklabels(x_ticks), plt.setp(ax.xaxis.get_majorticklabels(), rotation=90)
-    plt.xlabel('Subject ID (#samples)')
+    # ax.set_xticklabels(x_ticks), plt.setp(ax.xaxis.get_majorticklabels(), rotation=90)
+    # plt.xlabel('Subject ID (#samples)')
+    ax.set_xticks([], [])
     plt.ylabel('AUC'), plt.ylim(0, 1)
     for x in np.arange(0, len(sorted_subjects), 1):
         plt.axvline(x+0.5, -100, 100, color='k', linestyle='--')
