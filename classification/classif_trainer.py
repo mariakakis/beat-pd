@@ -70,11 +70,9 @@ def train_user_model(data, label_name, model_type):
             # Separate into features and labels
             x_train = subj_data_train.iloc[:, :-7].values
             x_test = subj_data_test.iloc[:, :-7].values
-            y_train = subj_data_train[label_name].values
-            y_test = subj_data_test[label_name].values
+            y_train = subj_data_train[label_name].values.astype(np.int)
+            y_test = subj_data_test[label_name].values.astype(np.int)
             train_classes, test_classes = np.unique(y_train), np.unique(y_test)
-            y_train = y_train.astype(np.int)
-            y_test = y_test.astype(np.int)
 
             # Make sure that folds don't cut the data in a weird way
             if len(train_classes) <= 1:
@@ -127,7 +125,6 @@ def train_user_model(data, label_name, model_type):
             model.fit(x_train, y_train)
             pred = model.predict(x_test)
             probs = model.predict_proba(x_test)
-            lab = train_classes
 
             # If doing ordinal logistic regression, map classes back
             if model_type in (CLASSIF_ORDINAL_RANDOM_FOREST, CLASSIF_ORDINAL_LOGISTIC) \
@@ -154,8 +151,8 @@ def train_user_model(data, label_name, model_type):
             pred_bin = np.vstack(pred_bin)
 
             # Binarize the results
-            y_test_binary = label_binarize(y_test, lab)
-            y_test_bin_binary = label_binarize(y_test_bin, lab)
+            y_test_binary = label_binarize(y_test, train_classes)
+            y_test_bin_binary = label_binarize(y_test_bin, train_classes)
 
             # Drop probabilities for classes not found in test data
             for i in list(range(np.shape(y_test_binary)[1]))[::-1]:
@@ -196,7 +193,7 @@ def train_user_model(data, label_name, model_type):
             macro_mae_gain = macro_mae - null_model_macro_mae
 
             # Calculate AUCs
-            if len(lab) > 2:
+            if len(train_classes) > 2:
                 auc = roc_auc_score(y_test_bin_binary, probs_bin, average='weighted')
             else:
                 auc = roc_auc_score(y_test_bin_binary, probs_bin[:, 0], average='weighted')
