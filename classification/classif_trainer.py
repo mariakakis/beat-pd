@@ -108,7 +108,7 @@ def train_user_model(data, label_name, model_type):
                     print_debug('Forced to remap labels')
                     y_train = np.array(list(map(lambda x: np.where(train_classes == x), y_train))).flatten()
             elif model_type == CLASSIF_MLP:
-                model = MLPClassifier(max_iter=1e3, random_state=RANDOM_SEED)
+                model = MLPClassifier(max_iter=1000, random_state=RANDOM_SEED)
                 num_features = x_train.shape[1]
                 half_x, quart_x = int(num_features/2), int(num_features/4)
                 param_grid = dict(hidden_layer_sizes=[(half_x), (half_x, quart_x)])
