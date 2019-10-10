@@ -121,7 +121,7 @@ def train_user_model(data, label_name, model_type):
             grid_search = GridSearchCV(model, param_grid=param_grid, cv=cross_validator)
             grid_search.fit(x_train, y_train)
             model.set_params(**grid_search.best_params_)
-            print('Best params:', **grid_search.best_params_)
+            print('Best params:', grid_search.best_params_)
 
             # Fit the model and predict classes
             model.fit(x_train, y_train)
