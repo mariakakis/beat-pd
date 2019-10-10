@@ -12,8 +12,10 @@ NUM_STRATIFIED_FOLDS = 5
 NUM_STRATIFIED_ROUNDS = 1
 PARAM_SEARCH_FOLDS = 5
 
-# TODO: check if mac or windows
-HOME_DIRECTORY = 'C:\\Users\\atm15.CSENETID\\Desktop\\beat-pd'
+if os.name == 'nt':
+    HOME_DIRECTORY = 'C:\\Users\\atm15.CSENETID\\Desktop\\beat-pd'
+else:
+    HOME_DIRECTORY = '~\\Desktop\\beat-pd'
 
 # Classifiers
 CLASSIF_RANDOM_FOREST = 'classif-rf'
