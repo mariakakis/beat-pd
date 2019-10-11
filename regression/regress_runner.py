@@ -1,5 +1,5 @@
 from settings import *
-from regression.regression_trainer import train_user_model
+from regression.regress_trainer import train_user_model
 from joblib import Parallel, delayed
 import itertools
 
