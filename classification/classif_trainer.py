@@ -257,7 +257,7 @@ def train_user_model(data, label_name, model_type):
     plt.axhline(0, 0, len(sorted_subjects), color='k', linestyle='--')
     plt.title(title2)
     ax.set_xticklabels(x_ticks), plt.setp(ax.xaxis.get_majorticklabels(), rotation=90)
-    plt.xlabel('Subject ID (#samples)'), plt.ylabel('Gain (Model - Null)')
+    plt.xlabel('Subject ID (#samples)'), plt.ylabel('Gain (Null - Model)')
     for x in np.arange(0, len(sorted_subjects), 1):
         plt.axvline(x+0.5, -100, 100, color='k', linestyle='--')
 
