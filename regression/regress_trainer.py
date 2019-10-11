@@ -185,7 +185,7 @@ def train_user_model(data, label_name, model_type):
             print_debug('AUC: %0.2f' % auc)
 
             # Add scores
-            scores = scores.append({'subject_id': subject,
+            scores = scores.append({'subject_id': subject, 'AUC': auc,
                                     'MSE': mse, 'MAE': mae,
                                     'MSE_gain': mse_gain, 'MAE_gain': mae_gain,
                                     'Macro_MSE': macro_mse, 'Macro_MAE': macro_mae,
