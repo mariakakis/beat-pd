@@ -92,7 +92,7 @@ def train_user_model(data, label_name, model_type):
             elif model_type == CLASSIF_XGBOOST:
                 model = xgb.XGBClassifier(objective="multi:softprob", random_state=RANDOM_SEED)
                 model.set_params(**{'num_class': len(train_classes)})
-                param_grid = dict(n_estimators=np.arange(80, 121, 20))
+                param_grid = dict(n_estimators=np.arange(25, 76, 10))
             elif model_type == CLASSIF_ORDINAL_RANDOM_FOREST:
                 model = OrdinalRandomForestClassifier(random_state=RANDOM_SEED)
                 param_grid = dict(n_estimators=np.arange(10, 51, 10))
