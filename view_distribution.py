@@ -1,8 +1,8 @@
 from settings import *
 
 # Get all of the metadata into the main data frame
-Data = pd.read_csv('./Watch_Features_Full.csv')
-Meta = pd.read_csv('./Metadata.csv')
+Data = pd.read_csv('./CIS_Watch_Features.csv')
+Meta = pd.read_csv('./CIS_Metadata.csv')
 Meta.set_index('measurement_id', inplace=True)
 Data['subject_id'] = Data.ID.apply(lambda x: Meta.loc[x, 'subject_id'])
 Data['timestamp'] = Data.ID.apply(lambda x: Meta.loc[x, 'timestamp'])

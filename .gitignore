@@ -1,5 +1,3 @@
-/Metadata.csv
-/Watch_Features_Full.csv
 .gitignore
 .idea/.gitignore
 .idea/beat-pd.iml
@@ -10,3 +8,4 @@
 .idea/vcs.xml
 __pycache__/
 /figs/
+/data/
