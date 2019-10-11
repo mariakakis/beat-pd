@@ -19,7 +19,6 @@ def train_user_model(data, label_name, model_type):
     if os.path.exists(filename):
         return
 
-    ground_truths, preds = np.array([]), np.array([])
     data_quantity = pd.DataFrame(columns=['subject_id', 'samples'])
     scores = pd.DataFrame(columns=['subject_id', 'AUC',
                                    'MSE', 'MAE', 'MSE_gain', 'MAE_gain',
@@ -99,7 +98,7 @@ def train_user_model(data, label_name, model_type):
                 param_grid = dict(n_estimators=np.arange(10, 51, 10))
             elif model_type == CLASSIF_ORDINAL_LOGISTIC:
                 model = mord.LogisticSE()
-                param_grid = dict(alpha=np.logspace(0, 3, 1))
+                param_grid = dict(alpha=np.logspace(-2, 0, 1))
             elif model_type == CLASSIF_MLP:
                 model = MLPClassifier(max_iter=1000, random_state=RANDOM_SEED)
                 num_features = x_train.shape[1]
@@ -123,32 +122,18 @@ def train_user_model(data, label_name, model_type):
 
             # Fit the model and predict classes
             model.fit(x_train, y_train)
-            pred = model.predict(x_test)
+            preds = model.predict(x_test)
             probs = model.predict_proba(x_test)
 
-            # If doing ordinal logistic regression, map classes back
-            if model_type in (CLASSIF_ORDINAL_RANDOM_FOREST, CLASSIF_ORDINAL_LOGISTIC) \
-                    and missing_class:
-                pred = np.array(list(map(lambda x: train_classes[x], pred))).flatten()
-                new_probs = np.zeros(shape=(probs.shape[0], np.max(train_classes)+1))
-                for c in train_classes:
-                    new_probs[:, c] = probs[:, np.where(train_classes == c)].flatten()
-
-            # Concatenate results
-            ground_truths = np.concatenate([ground_truths, y_test])
-            preds = np.concatenate([preds, pred])
-
             # Bin probabilities over each diary entry
-            probs_bin = []
-            y_test_bin = []
-            pred_bin = []
+            y_test_bin, preds_bin, probs_bin = [], [], []
             for ID in np.unique(id_test):
-                probs_bin.append(np.mean(probs[id_test == ID, :], axis=0).reshape([1, -1]))
                 y_test_bin.append(np.mean(y_test[id_test == ID]))
-                pred_bin.append(np.mean(pred[id_test == ID]))
-            probs_bin = np.vstack(probs_bin)
+                preds_bin.append(np.mean(preds[id_test == ID]))
+                probs_bin.append(np.mean(probs[id_test == ID, :], axis=0).reshape([1, -1]))
             y_test_bin = np.vstack(y_test_bin)
-            pred_bin = np.vstack(pred_bin)
+            preds_bin = np.vstack(preds_bin)
+            probs_bin = np.vstack(probs_bin)
 
             # Binarize the results
             y_test_binary = label_binarize(y_test, train_classes)
@@ -157,18 +142,18 @@ def train_user_model(data, label_name, model_type):
             # Drop probabilities for classes not found in test data
             for i in list(range(np.shape(y_test_binary)[1]))[::-1]:
                 if not any(y_test_bin_binary[:, i]):
-                    probs = np.delete(probs, i, axis=1)
-                    probs_bin = np.delete(probs_bin, i, axis=1)
                     y_test_binary = np.delete(y_test_binary, i, axis=1)
                     y_test_bin_binary = np.delete(y_test_bin_binary, i, axis=1)
+                    probs = np.delete(probs, i, axis=1)
+                    probs_bin = np.delete(probs_bin, i, axis=1)
 
             # Calculate MSE/MAE
-            mse = mean_squared_error(y_test_bin, pred_bin)
-            mae = mean_absolute_error(y_test_bin, pred_bin)
+            mse = mean_squared_error(y_test_bin, preds_bin)
+            mae = mean_absolute_error(y_test_bin, preds_bin)
 
             # Compute null model MSE/MAE and the gain
-            mse_trivial = np.ones(pred_bin.shape) * np.mean(y_train)
-            mae_trivial = np.ones(pred_bin.shape) * np.median(y_train)
+            mse_trivial = np.ones(preds_bin.shape) * np.mean(y_train)
+            mae_trivial = np.ones(preds_bin.shape) * np.median(y_train)
             null_model_mse = mean_squared_error(y_test_bin, mse_trivial)
             null_model_mae = mean_absolute_error(y_test_bin, mae_trivial)
             mse_gain = mse - null_model_mse
@@ -178,13 +163,13 @@ def train_user_model(data, label_name, model_type):
             macro_mse, macro_mae = 0, 0
             for c in train_classes:
                 idxs = np.where(y_test_bin == c)
-                macro_mse += mean_squared_error(y_test_bin[idxs], pred_bin[idxs])/len(train_classes)
-                macro_mae += mean_absolute_error(y_test_bin[idxs], pred_bin[idxs])/len(train_classes)
+                macro_mse += mean_squared_error(y_test_bin[idxs], preds_bin[idxs])/len(train_classes)
+                macro_mae += mean_absolute_error(y_test_bin[idxs], preds_bin[idxs])/len(train_classes)
 
             # Compute null model macro-MSE/macro-MAE and the gain
             null_model_macro_mse, null_model_macro_mae = 0, 0
-            macro_mse_trivial = np.ones(pred_bin.shape) * np.mean(train_classes)
-            macro_mae_trivial = np.ones(pred_bin.shape) * np.median(train_classes)
+            macro_mse_trivial = np.ones(preds_bin.shape) * np.mean(train_classes)
+            macro_mae_trivial = np.ones(preds_bin.shape) * np.median(train_classes)
             for c in train_classes:
                 idxs = np.where(y_test_bin == c)
                 null_model_macro_mse += mean_squared_error(y_test_bin[idxs], macro_mse_trivial[idxs]) / len(train_classes)
