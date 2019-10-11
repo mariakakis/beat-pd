@@ -156,8 +156,8 @@ def train_user_model(data, label_name, model_type):
             mae_trivial = np.ones(preds_bin.shape) * np.median(y_train)
             null_model_mse = mean_squared_error(y_test_bin, mse_trivial)
             null_model_mae = mean_absolute_error(y_test_bin, mae_trivial)
-            mse_gain = mse - null_model_mse
-            mae_gain = mae - null_model_mae
+            mse_gain = null_model_mse - mse
+            mae_gain = null_model_mae - mae
 
             # Compute macro-MSE/MAE
             macro_mse, macro_mae = 0, 0
@@ -174,8 +174,8 @@ def train_user_model(data, label_name, model_type):
                 idxs = np.where(y_test_bin == c)
                 null_model_macro_mse += mean_squared_error(y_test_bin[idxs], macro_mse_trivial[idxs]) / len(train_classes)
                 null_model_macro_mae += mean_absolute_error(y_test_bin[idxs], macro_mae_trivial[idxs]) / len(train_classes)
-            macro_mse_gain = macro_mse - null_model_macro_mse
-            macro_mae_gain = macro_mae - null_model_macro_mae
+            macro_mse_gain = null_model_macro_mse - macro_mse
+            macro_mae_gain = null_model_macro_mae - macro_mae
 
             # Calculate AUCs
             if len(train_classes) > 2:
