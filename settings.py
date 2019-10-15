@@ -14,7 +14,7 @@ NUM_STRATIFIED_ROUNDS = 1
 PARAM_SEARCH_FOLDS = 5
 
 if os.name == 'nt':
-    HOME_DIRECTORY = os.path.join('C:', 'Users', 'atm15.CSENETID', 'Desktop', 'beat-pd')
+    HOME_DIRECTORY = os.path.join('C:\\', 'Users', 'atm15.CSENETID', 'Desktop', 'beat-pd')
 else:
     HOME_DIRECTORY = os.path.join('~', 'Desktop', 'beat-pd')
 
