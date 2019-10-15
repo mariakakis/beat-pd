@@ -7,5 +7,5 @@
 .idea/modules.xml
 .idea/vcs.xml
 __pycache__/
-/figs/
+/output/
 /data/

@@ -4,27 +4,28 @@ import scipy
 import seaborn as sns
 import pandas as pd
 import os
+import csv
 
 # Training parameters
 MIN_OBSERVATIONS_PER_SUBJECT = 40
 MIN_OBSERVATIONS_PER_CLASS = 10
-NUM_STRATIFIED_FOLDS = 5
+NUM_STRATIFIED_FOLDS = 2 #5
 NUM_STRATIFIED_ROUNDS = 1
-PARAM_SEARCH_FOLDS = 5
+PARAM_SEARCH_FOLDS = 2 #5
 
 if os.name == 'nt':
     HOME_DIRECTORY = 'C:\\Users\\atm15.CSENETID\\Desktop\\beat-pd'
 else:
-    HOME_DIRECTORY = '~\\Desktop\\beat-pd'
+    HOME_DIRECTORY = os.path.join('~', 'Desktop', 'beat-pd')
 
 # Classifiers
 CLASSIF_RANDOM_FOREST = 'classif-rf'
 CLASSIF_XGBOOST = 'classif-xg'
+CLASSIF_MLP = 'classif-mlp'
 CLASSIF_ORDINAL_LOGISTIC = 'classif-ord-log'
 CLASSIF_ORDINAL_RANDOM_FOREST = 'classif-ord-rf'
-CLASSIF_MLP = 'classif-mlp'
-CLASSIFIERS = [CLASSIF_ORDINAL_LOGISTIC, CLASSIF_ORDINAL_RANDOM_FOREST,
-               CLASSIF_RANDOM_FOREST, CLASSIF_XGBOOST, CLASSIF_MLP]
+CLASSIFIERS = [CLASSIF_RANDOM_FOREST, CLASSIF_XGBOOST, CLASSIF_MLP,
+               CLASSIF_ORDINAL_LOGISTIC, CLASSIF_ORDINAL_RANDOM_FOREST]
 
 # Regressors
 REGRESS_XGBOOST = 'regress-xg'

@@ -1,13 +1,12 @@
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, GridSearchCV
-from sklearn.metrics import roc_auc_score, mean_absolute_error, mean_squared_error
-from sklearn.preprocessing import label_binarize
 import mord
-from classification.ordinal_models.ordinal_rf import OrdinalRandomForestClassifier
+from classification.ordinal_rf import OrdinalRandomForestClassifier
 import xgboost as xgb
 import scipy.stats
 from settings import *
+from helpers import calculate_scores, generate_plots
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -15,16 +14,18 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def train_user_model(data, label_name, model_type):
     print('Model:', model_type, ', Label:', label_name)
-    filename = os.path.join(HOME_DIRECTORY, 'figs', 'classification', '%s_%s.png' % (model_type, label_name))
-    if os.path.exists(filename):
+    image_filename = os.path.join(HOME_DIRECTORY, 'output', 'classification', '%s_%s.png' % (model_type, label_name))
+    csv_filename = os.path.join(HOME_DIRECTORY, 'output', 'classification', '%s_%s.csv' % (model_type, label_name))
+    if os.path.exists(image_filename):
         return
 
-    data_quantity = pd.DataFrame(columns=['subject_id', 'samples'])
-    scores = pd.DataFrame(columns=['subject_id', 'AUC',
-                                   'MSE', 'MAE', 'MSE_gain', 'MAE_gain',
-                                   'Macro_MSE', 'Macro_MAE', 'Macro_MSE_gain', 'Macro_MAE_gain'])
+    results = pd.DataFrame(columns=['subject_id', 'n_total', 'n_train', 'n_test', 'auc',
+                                    'mse', 'vse', 'null_mse', 'null_vse',
+                                    'mae', 'vae', 'null_mae', 'null_vae',
+                                    'macro_mse', 'macro_vse', 'null_macro_mse', 'null_macro_vse',
+                                    'macro_mae', 'macro_vae', 'null_macro_mae', 'null_macro_vae'])
     sorted_subjects = sorted(data.subject_id.unique())
-    for subject in sorted_subjects:
+    for subject in sorted_subjects[:3]:
         print_debug('--------------')
         print('Subject: %s' % subject)
 
@@ -37,7 +38,6 @@ def train_user_model(data, label_name, model_type):
 
         # Make a table that just has unique measurement_ids and labels for the user
         id_table = subj_data[['ID', label_name]].drop_duplicates()
-        data_quantity = data_quantity.append({'subject_id': subject, 'samples': len(id_table)}, ignore_index=True)
 
         # Remove any classes with not enough samples
         label_counts = id_table[label_name].value_counts()
@@ -98,7 +98,7 @@ def train_user_model(data, label_name, model_type):
                 param_grid = dict(n_estimators=np.arange(10, 51, 10))
             elif model_type == CLASSIF_ORDINAL_LOGISTIC:
                 model = mord.LogisticSE()
-                param_grid = dict(alpha=np.logspace(-2, 0, 1))
+                param_grid = dict(alpha=np.logspace(-1, 1, 1))
             elif model_type == CLASSIF_MLP:
                 model = MLPClassifier(max_iter=1000, random_state=RANDOM_SEED)
                 num_features = x_train.shape[1]
@@ -125,143 +125,18 @@ def train_user_model(data, label_name, model_type):
             preds = model.predict(x_test)
             probs = model.predict_proba(x_test)
 
-            # Bin probabilities over each diary entry
-            y_test_bin, preds_bin, probs_bin = [], [], []
-            for ID in np.unique(id_test):
-                y_test_bin.append(np.mean(y_test[id_test == ID]))
-                preds_bin.append(np.mean(preds[id_test == ID]))
-                probs_bin.append(np.mean(probs[id_test == ID, :], axis=0).reshape([1, -1]))
-            y_test_bin = np.vstack(y_test_bin)
-            preds_bin = np.vstack(preds_bin)
-            probs_bin = np.vstack(probs_bin)
+            # Calculate scores and other subject information
+            scores = calculate_scores(y_train, y_test, train_classes, id_test, preds, probs)
+            result = {'subject_id': subject, 'n_total': len(train_idxs)+len(test_idxs),
+                      'n_train': len(train_idxs), 'n_test': len(test_idxs),
+                      **scores}
+            results = results.append(result, ignore_index=True)
 
-            # Binarize the results
-            y_test_binary = label_binarize(y_test, train_classes)
-            y_test_bin_binary = label_binarize(y_test_bin, train_classes)
+    # Save results
+    results.to_csv(csv_filename, index=False, encoding='utf-8')
 
-            # Drop probabilities for classes not found in test data
-            for i in list(range(np.shape(y_test_binary)[1]))[::-1]:
-                if not any(y_test_bin_binary[:, i]):
-                    y_test_binary = np.delete(y_test_binary, i, axis=1)
-                    y_test_bin_binary = np.delete(y_test_bin_binary, i, axis=1)
-                    probs = np.delete(probs, i, axis=1)
-                    probs_bin = np.delete(probs_bin, i, axis=1)
-
-            # Calculate MSE/MAE
-            mse = mean_squared_error(y_test_bin, preds_bin)
-            mae = mean_absolute_error(y_test_bin, preds_bin)
-
-            # Compute null model MSE/MAE and the gain
-            mse_trivial = np.ones(preds_bin.shape) * np.mean(y_train)
-            mae_trivial = np.ones(preds_bin.shape) * np.median(y_train)
-            null_model_mse = mean_squared_error(y_test_bin, mse_trivial)
-            null_model_mae = mean_absolute_error(y_test_bin, mae_trivial)
-            mse_gain = null_model_mse - mse
-            mae_gain = null_model_mae - mae
-
-            # Compute macro-MSE/MAE
-            macro_mse, macro_mae = 0, 0
-            for c in train_classes:
-                idxs = np.where(y_test_bin == c)
-                macro_mse += mean_squared_error(y_test_bin[idxs], preds_bin[idxs])/len(train_classes)
-                macro_mae += mean_absolute_error(y_test_bin[idxs], preds_bin[idxs])/len(train_classes)
-
-            # Compute null model macro-MSE/macro-MAE and the gain
-            null_model_macro_mse, null_model_macro_mae = 0, 0
-            macro_mse_trivial = np.ones(preds_bin.shape) * np.mean(train_classes)
-            macro_mae_trivial = np.ones(preds_bin.shape) * np.median(train_classes)
-            for c in train_classes:
-                idxs = np.where(y_test_bin == c)
-                null_model_macro_mse += mean_squared_error(y_test_bin[idxs], macro_mse_trivial[idxs]) / len(train_classes)
-                null_model_macro_mae += mean_absolute_error(y_test_bin[idxs], macro_mae_trivial[idxs]) / len(train_classes)
-            macro_mse_gain = null_model_macro_mse - macro_mse
-            macro_mae_gain = null_model_macro_mae - macro_mae
-
-            # Calculate AUCs
-            if len(train_classes) > 2:
-                auc = roc_auc_score(y_test_bin_binary, probs_bin, average='weighted')
-            else:
-                auc = roc_auc_score(y_test_bin_binary, probs_bin[:, 0], average='weighted')
-            print_debug('AUC: %0.2f' % auc)
-
-            # Add scores
-            scores = scores.append({'subject_id': subject, 'AUC': auc,
-                                    'MSE': mse, 'MAE': mae,
-                                    'MSE_gain': mse_gain, 'MAE_gain': mae_gain,
-                                    'Macro_MSE': macro_mse, 'Macro_MAE': macro_mae,
-                                    'Macro_MSE_gain': macro_mse_gain, 'Macro_MAE_gain': macro_mae_gain},
-                                   ignore_index=True)
-
-    # Compute means and CIs
-    auc_mean, auc_stderr = compute_mean_ci(scores.AUC)
-    mse_mean, mse_stderr = compute_mean_ci(scores.MSE)
-    mae_mean, mae_stderr = compute_mean_ci(scores.MAE)
-    macro_mse_mean, macro_mse_stderr = compute_mean_ci(scores.Macro_MSE)
-    macro_mae_mean, macro_mae_stderr = compute_mean_ci(scores.Macro_MAE)
-    mse_gain_mean, mse_gain_stderr = compute_mean_ci(scores.MSE_gain)
-    mae_gain_mean, mae_gain_stderr = compute_mean_ci(scores.MAE_gain)
-    macro_mse_gain_mean, macro_mse_gain_stderr = compute_mean_ci(scores.Macro_MSE_gain)
-    macro_mae_gain_mean, macro_mae_gain_stderr = compute_mean_ci(scores.Macro_MAE_gain)
-
-    # Stack MSE/MAE for second plot 
-    scores_plot = scores.copy()
-    scores_plot = scores_plot.melt(id_vars='subject_id',
-                                   value_vars=["MSE_gain", "MAE_gain", "Macro_MSE_gain", "Macro_MAE_gain"])
-    scores_plot = scores_plot.replace("MSE_gain", "MSE")
-    scores_plot = scores_plot.replace("MAE_gain", "MAE")
-    scores_plot = scores_plot.replace("Macro_MSE_gain", "Macro_MSE")
-    scores_plot = scores_plot.replace("Macro_MAE_gain", "Macro_MAE")
-
-    # Create titles
-    title1 = 'Model: %s, Label: %s\n' % (model_type, label_name)
-    title1 += 'AUC = %0.2f±%0.2f' % (auc_mean, auc_stderr)
-
-    title2 = 'MSE = %0.2f±%0.2f, ' \
-             'MAE = %0.2f±%0.2f, ' % \
-             (mse_mean, mse_stderr,
-              mae_mean, mae_stderr)
-    title2 += 'Macro MSE = %0.2f±%0.2f, ' \
-              'Macro MAE = %0.2f±%0.2f\n' % \
-              (macro_mse_mean, macro_mse_stderr,
-               macro_mae_mean, macro_mae_stderr)
-    title2 += 'MSE Gain = %0.2f±%0.2f, ' \
-              'MAE Gain = %0.2f±%0.2f, ' % \
-              (mse_gain_mean, mse_gain_stderr,
-               mae_gain_mean, mae_gain_stderr)
-    title2 += 'Macro MSE Gain = %0.2f±%0.2f, ' \
-              'Macro MAE Gain = %0.2f±%0.2f' % \
-              (macro_mse_gain_mean, macro_mse_gain_stderr,
-               macro_mae_gain_mean, macro_mae_gain_stderr)
-
-    # Create x-ticks
-    x_ticks = ['%d (%d)' % (subj, quant) for subj, quant in zip(data_quantity.subject_id.values, data_quantity.samples.values)
-               if subj in scores.subject_id.values]
-
-    # Plot boxplot of AUCs
-    sns.set(style="whitegrid")
-    fig = plt.figure(figsize=(10, 15))
-    ax = fig.add_subplot(211)
-    sns.boxplot(x='subject_id', y='AUC', data=scores)
-    plt.axhline(0.5, 0, len(sorted_subjects), color='k', linestyle='--')
-    plt.title(title1)
-    # ax.set_xticklabels(x_ticks), plt.setp(ax.xaxis.get_majorticklabels(), rotation=90)
-    # plt.xlabel('Subject ID (#samples)')
-    ax.set_xticks([], [])
-    plt.ylabel('AUC'), plt.ylim(0, 1)
-    for x in np.arange(0, len(sorted_subjects), 1):
-        plt.axvline(x+0.5, -100, 100, color='k', linestyle='--')
-
-    ax = fig.add_subplot(212)
-    sns.boxplot(x='subject_id', y='value', data=scores_plot, hue='variable')
-    plt.axhline(0, 0, len(sorted_subjects), color='k', linestyle='--')
-    plt.title(title2)
-    ax.set_xticklabels(x_ticks), plt.setp(ax.xaxis.get_majorticklabels(), rotation=90)
-    plt.xlabel('Subject ID (#samples)'), plt.ylabel('Gain (Null - Model)')
-    for x in np.arange(0, len(sorted_subjects), 1):
-        plt.axvline(x+0.5, -100, 100, color='k', linestyle='--')
-
-    plt.savefig(filename, bbox_inches='tight')
-    plt.show()
+    # Plot results
+    generate_plots(results, image_filename, model_type, label_name)
     print('**********************')
 
 

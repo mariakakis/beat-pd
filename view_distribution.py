@@ -1,8 +1,8 @@
 from settings import *
 
 # Get all of the metadata into the main data frame
-Data = pd.read_csv('./CIS_Watch_Features.csv')
-Meta = pd.read_csv('./CIS_Metadata.csv')
+Data = pd.read_csv(os.path.join(HOME_DIRECTORY, 'data/CIS_Watch_Features.csv'))
+Meta = pd.read_csv(os.path.join(HOME_DIRECTORY, 'data/CIS_Metadata.csv'))
 Meta.set_index('measurement_id', inplace=True)
 Data['subject_id'] = Data.ID.apply(lambda x: Meta.loc[x, 'subject_id'])
 Data['timestamp'] = Data.ID.apply(lambda x: Meta.loc[x, 'timestamp'])
@@ -98,5 +98,5 @@ for label_name in ['on_off', 'dyskinesia', 'tremor']:
     plt.xticks(ind, sorted_subjects), plt.setp(ax.xaxis.get_majorticklabels(), rotation=90)
     plt.xlabel('Subject ID'), plt.ylabel('Normalized Count Pre Filtering')
 
-    plt.savefig(os.path.join('figs', 'distributions', '%s.png' % label_name), bbox_inches='tight')
+    plt.savefig(os.path.join('output', 'distributions', '%s.png' % label_name), bbox_inches='tight')
     plt.show()
