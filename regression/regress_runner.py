@@ -21,7 +21,7 @@ print('Done processing data')
 # Make directories
 make_dir(HOME_DIRECTORY)
 make_dir(os.path.join(HOME_DIRECTORY, 'output'))
-make_dir(os.path.join(HOME_DIRECTORY, 'output', 'classification'))
+make_dir(os.path.join(HOME_DIRECTORY, 'output', 'regression'))
 
 # Train for each label
 label_names = ['on_off', 'dyskinesia', 'tremor']

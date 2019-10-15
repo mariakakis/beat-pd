@@ -101,10 +101,10 @@ def calculate_scores(y_train, y_test, train_classes, id_test, preds, probs):
 
 def generate_plots(results, filename, model_type, label_name):
     # Compute percent gains
-    results['mse_percent_gain'] = (results['null_mse']-results['mse']) / results['null_mse']
-    results['mae_percent_gain'] = (results['null_mae']-results['null_mae']) / results['null_mae']
-    results['macro_mse_percent_gain'] = (results['null_macro_mse']-results['macro_mse']) / results['null_macro_mse']
-    results['macro_mae_percent_gain'] = (results['null_macro_mae']-results['macro_mae']) / results['null_macro_mae']
+    results['mse_percent_gain'] = (results['null_mse']-results['mse'])/results['null_mse']*100
+    results['mae_percent_gain'] = (results['null_mae']-results['mae'])/results['null_mae']*100
+    results['macro_mse_percent_gain'] = (results['null_macro_mse']-results['macro_mse'])/results['null_macro_mse']*100
+    results['macro_mae_percent_gain'] = (results['null_macro_mae']-results['macro_mae'])/results['null_macro_mae']*100
 
     # Stack metrics for second plot
     results_plot = results.melt(id_vars='subject_id',
