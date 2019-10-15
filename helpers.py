@@ -2,6 +2,7 @@ from settings import *
 from sklearn.metrics import roc_auc_score, mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import label_binarize
 from scipy import stats
+import errno
 
 
 def var_squared_error(y1, y2):
@@ -174,3 +175,13 @@ def generate_plots(results, filename, model_type, label_name):
 
     plt.savefig(filename, bbox_inches='tight')
     plt.show()
+
+
+def make_dir(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise

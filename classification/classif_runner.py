@@ -2,6 +2,7 @@ from settings import *
 from classification.classif_trainer import train_user_model
 from joblib import Parallel, delayed
 import itertools
+from helpers import make_dir
 
 
 # Get all of the metadata into the main data frame
@@ -15,6 +16,11 @@ Data['dyskinesia'] = Data.ID.apply(lambda x: Meta.loc[x, 'dyskinesia'])
 Data['on_off'] = Data.ID.apply(lambda x: Meta.loc[x, 'on_off'])
 Data['tremor'] = Data.ID.apply(lambda x: Meta.loc[x, 'tremor'])
 print('Done processing data')
+
+# Make directories
+make_dir(HOME_DIRECTORY)
+make_dir(os.path.join(HOME_DIRECTORY, 'output'))
+make_dir(os.path.join(HOME_DIRECTORY, 'output', 'classification'))
 
 # Train for each label
 label_names = ['on_off', 'dyskinesia', 'tremor']
