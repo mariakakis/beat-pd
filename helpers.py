@@ -77,7 +77,7 @@ def calculate_scores(y_train, y_test, train_classes, id_test, preds, probs):
         null_macro_mse += mean_squared_error(y_test_bin[idxs], macro_mse_trivial[idxs]) / len(train_classes)
         null_macro_vse += var_squared_error(y_test_bin[idxs], macro_mse_trivial[idxs]) / len(train_classes)
         null_macro_mae += mean_absolute_error(y_test_bin[idxs], macro_mae_trivial[idxs]) / len(train_classes)
-        null_macro_vae += var_absolute_error(y_test_bin[idxs], macro_mse_trivial[idxs]) / len(train_classes)
+        null_macro_vae += var_absolute_error(y_test_bin[idxs], macro_mae_trivial[idxs]) / len(train_classes)
 
     # Calculate AUCs
     if len(train_classes) > 2:
@@ -95,6 +95,7 @@ def calculate_scores(y_train, y_test, train_classes, id_test, preds, probs):
               'null_macro_mse': null_macro_mse, 'null_macro_vse': null_macro_vse,
               'macro_mae': macro_mae, 'macro_vae': macro_vae,
               'null_macro_mae': null_macro_mae, 'null_macro_vae': null_macro_vae}
+    print(scores)
     return scores
 
 
