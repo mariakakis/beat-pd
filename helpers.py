@@ -95,7 +95,6 @@ def calculate_scores(y_train, y_test, train_classes, id_test, preds, probs):
               'null_macro_mse': null_macro_mse, 'null_macro_vse': null_macro_vse,
               'macro_mae': macro_mae, 'macro_vae': macro_vae,
               'null_macro_mae': null_macro_mae, 'null_macro_vae': null_macro_vae}
-    print(scores)
     return scores
 
 
@@ -138,12 +137,12 @@ def generate_plots(results, filename, model_type, label_name):
               'Macro MAE = %0.2f±%0.2f\n' % \
               (macro_mse_mean, macro_mse_stderr,
                macro_mae_mean, macro_mae_stderr)
-    title2 += 'MSE Percent Gain = %0.2f±%0.2f, ' \
-              'MAE Percent Gain = %0.2f±%0.2f, ' % \
+    title2 += 'MSE %%Gain = %0.2f±%0.2f, ' \
+              'MAE %%Gain = %0.2f±%0.2f, ' % \
               (mse_percent_gain_mean, mse_percent_gain_stderr,
                mae_percent_gain_mean, mae_percent_gain_stderr)
-    title2 += 'Macro MSE Percent Gain = %0.2f±%0.2f, ' \
-              'Macro MAE Percent Gain = %0.2f±%0.2f' % \
+    title2 += 'Macro MSE %%Gain = %0.2f±%0.2f, ' \
+              'Macro MAE %%Gain = %0.2f±%0.2f' % \
               (macro_mse_percent_gain_mean, macro_mse_percent_gain_stderr,
                macro_mae_percent_gain_mean, macro_mae_percent_gain_stderr)
 
