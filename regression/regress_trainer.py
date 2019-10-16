@@ -124,7 +124,7 @@ def train_user_model(data, label_name, model_type):
                 probs[i, :] = prob_vec
 
             # Calculate scores and other subject information
-            scores = calculate_scores(y_train, y_test, train_classes, id_test, preds, probs)
+            scores = calculate_scores(y_train, y_test, train_classes, test_classes, id_test, preds, probs)
             result = {'subject_id': subject, 'n_total': len(train_idxs) + len(test_idxs),
                       'n_train': len(train_idxs), 'n_test': len(test_idxs),
                       **scores}
