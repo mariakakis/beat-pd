@@ -1,3 +1,4 @@
+from sklearn.feature_selection import SelectPercentile, mutual_info_classif
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
@@ -88,31 +89,36 @@ def train_user_model(data, label_name, model_type):
                 print_debug('There is a test class that is not in train')
                 continue
 
-            # Pick the correct model
+            # Construct the automatic feature selection method
+            feature_selection = SelectPercentile(mutual_info_classif)
+            param_grid = {'featsel__percentile': np.arange(25, 101, 25)}
+
+            # Construct the base model
             missing_class = any([k != train_classes[k] for k in range(len(train_classes))])
             if model_type == CLASSIF_RANDOM_FOREST:
                 base_model = RandomForestClassifier(random_state=RANDOM_SEED)
-                param_grid = dict(model__n_estimators=np.arange(10, 51, 10))
+                param_grid = {'model__n_estimators': np.arange(10, 51, 10), **param_grid}
             elif model_type == CLASSIF_XGBOOST:
                 base_model = xgb.XGBClassifier(objective="multi:softprob", random_state=RANDOM_SEED)
                 base_model.set_params(**{'num_class': len(train_classes)})
-                param_grid = dict(model__n_estimators=np.arange(25, 76, 10))
+                param_grid = {'model__n_estimators': np.arange(25, 76, 10), **param_grid}
             elif model_type == CLASSIF_ORDINAL_RANDOM_FOREST:
                 base_model = OrdinalRandomForestClassifier(random_state=RANDOM_SEED)
-                param_grid = dict(model__n_estimators=np.arange(10, 51, 10))
+                param_grid = {'model__n_estimators': np.arange(10, 51, 10), **param_grid}
             elif model_type == CLASSIF_ORDINAL_LOGISTIC:
                 base_model = mord.LogisticSE()
-                param_grid = dict(model__alpha=np.logspace(-1, 1, 1))
+                param_grid = {'model__alpha': np.logspace(-1, 1, 3), **param_grid}
             elif model_type == CLASSIF_MLP:
                 base_model = MLPClassifier(max_iter=1000, random_state=RANDOM_SEED)
                 num_features = x_train.shape[1]
                 half_x, quart_x = int(num_features/2), int(num_features/4)
-                param_grid = dict(model__hidden_layer_sizes=[(half_x), (half_x, quart_x)])
+                param_grid = {'model__hidden_layer_sizes': [(half_x), (half_x, quart_x)], **param_grid}
             else:
                 raise Exception('Not a valid model type')
 
             # Create a pipeline
             pipeline = Pipeline([
+                ('featsel', feature_selection),
                 ('model', base_model)
             ])
 

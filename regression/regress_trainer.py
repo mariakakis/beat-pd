@@ -1,4 +1,6 @@
+from sklearn.exceptions import DataConversionWarning
 from sklearn.pipeline import Pipeline
+from sklearn.feature_selection import SelectPercentile, mutual_info_regression
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, GridSearchCV
 from sklearn.neural_network import MLPRegressor
 import xgboost as xgb
@@ -7,6 +9,7 @@ from helpers import calculate_scores, generate_plots
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=DataConversionWarning)
 
 
 def train_user_model(data, label_name, model_type):
@@ -84,20 +87,25 @@ def train_user_model(data, label_name, model_type):
                 print_debug('There is a test class that is not in train')
                 continue
 
-            # Pick the correct model
+            # Construct the automatic feature selection method
+            feature_selection = SelectPercentile(mutual_info_regression)
+            param_grid = {'featsel__percentile': np.arange(25, 101, 25)}
+
+            # Construct the base model
             if model_type == REGRESS_XGBOOST:
                 base_model = xgb.XGBRegressor(objective="reg:squarederror", random_state=RANDOM_SEED)
-                param_grid = dict(model__n_estimators=np.arange(25, 76, 10))
+                param_grid = {'model__n_estimators': np.arange(25, 76, 10), **param_grid}
             elif model_type == REGRESS_MLP:
                 base_model = MLPRegressor(max_iter=1000, random_state=RANDOM_SEED)
                 num_features = x_train.shape[1]
-                half_x, quart_x = int(num_features / 2), int(num_features / 4)
-                param_grid = dict(model__hidden_layer_sizes=[(half_x), (half_x, quart_x)])
+                half_x, quart_x = int(num_features/2), int(num_features/4)
+                param_grid = {'model__hidden_layer_sizes': [(half_x), (half_x, quart_x)], **param_grid}
             else:
                 raise Exception('Not a valid model type')
 
             # Create a pipeline
             pipeline = Pipeline([
+                ('featsel', feature_selection),
                 ('model', base_model)
             ])
 

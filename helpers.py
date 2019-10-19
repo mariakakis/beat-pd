@@ -16,7 +16,6 @@ def var_absolute_error(y1, y2):
 def compute_mean_ci(x):
     mean_x = np.mean(x)
     stderr_x = scipy.stats.sem(x)
-    # ci = (mean_x-1.98*stderr_x, mean_x+1.98*stderr_x)
     return mean_x, stderr_x
 
 
