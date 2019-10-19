@@ -1,8 +1,9 @@
+from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, GridSearchCV
-import mord
 from classification.ordinal_rf import OrdinalRandomForestClassifier
+import mord
 import xgboost as xgb
 import scipy.stats
 from settings import *
@@ -25,6 +26,9 @@ def train_user_model(data, label_name, model_type):
                                     'macro_mse', 'macro_vse', 'null_macro_mse', 'null_macro_vse',
                                     'macro_mae', 'macro_vae', 'null_macro_mae', 'null_macro_vae'])
     sorted_subjects = sorted(data.subject_id.unique())
+    if DEBUG:
+        sorted_subjects = sorted_subjects[:2]
+
     for subject in sorted_subjects:
         print_debug('--------------')
         print('Subject: %s' % subject)
@@ -87,25 +91,30 @@ def train_user_model(data, label_name, model_type):
             # Pick the correct model
             missing_class = any([k != train_classes[k] for k in range(len(train_classes))])
             if model_type == CLASSIF_RANDOM_FOREST:
-                model = RandomForestClassifier(random_state=RANDOM_SEED)
-                param_grid = dict(n_estimators=np.arange(10, 51, 10))
+                base_model = RandomForestClassifier(random_state=RANDOM_SEED)
+                param_grid = dict(model__n_estimators=np.arange(10, 51, 10))
             elif model_type == CLASSIF_XGBOOST:
-                model = xgb.XGBClassifier(objective="multi:softprob", random_state=RANDOM_SEED)
-                model.set_params(**{'num_class': len(train_classes)})
-                param_grid = dict(n_estimators=np.arange(25, 76, 10))
+                base_model = xgb.XGBClassifier(objective="multi:softprob", random_state=RANDOM_SEED)
+                base_model.set_params(**{'num_class': len(train_classes)})
+                param_grid = dict(model__n_estimators=np.arange(25, 76, 10))
             elif model_type == CLASSIF_ORDINAL_RANDOM_FOREST:
-                model = OrdinalRandomForestClassifier(random_state=RANDOM_SEED)
-                param_grid = dict(n_estimators=np.arange(10, 51, 10))
+                base_model = OrdinalRandomForestClassifier(random_state=RANDOM_SEED)
+                param_grid = dict(model__n_estimators=np.arange(10, 51, 10))
             elif model_type == CLASSIF_ORDINAL_LOGISTIC:
-                model = mord.LogisticSE()
-                param_grid = dict(alpha=np.logspace(-1, 1, 1))
+                base_model = mord.LogisticSE()
+                param_grid = dict(model__alpha=np.logspace(-1, 1, 1))
             elif model_type == CLASSIF_MLP:
-                model = MLPClassifier(max_iter=1000, random_state=RANDOM_SEED)
+                base_model = MLPClassifier(max_iter=1000, random_state=RANDOM_SEED)
                 num_features = x_train.shape[1]
                 half_x, quart_x = int(num_features/2), int(num_features/4)
-                param_grid = dict(hidden_layer_sizes=[(half_x), (half_x, quart_x)])
+                param_grid = dict(model__hidden_layer_sizes=[(half_x), (half_x, quart_x)])
             else:
                 raise Exception('Not a valid model type')
+
+            # Create a pipeline
+            pipeline = Pipeline([
+                ('model', base_model)
+            ])
 
             # Remap classes to fill in gap if one exists
             if model_type in (CLASSIF_ORDINAL_RANDOM_FOREST, CLASSIF_ORDINAL_LOGISTIC) \
@@ -115,9 +124,9 @@ def train_user_model(data, label_name, model_type):
 
             # Identify ideal parameters using stratified k-fold cross-validation
             cross_validator = StratifiedKFold(n_splits=PARAM_SEARCH_FOLDS, random_state=RANDOM_SEED)
-            grid_search = GridSearchCV(model, param_grid=param_grid, cv=cross_validator)
+            grid_search = GridSearchCV(pipeline, param_grid=param_grid, cv=cross_validator)
             grid_search.fit(x_train, y_train)
-            model.set_params(**grid_search.best_params_)
+            model = pipeline.set_params(**grid_search.best_params_)
             print('Best params:', grid_search.best_params_)
 
             # Fit the model and predict classes

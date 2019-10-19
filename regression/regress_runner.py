@@ -26,8 +26,8 @@ make_dir(os.path.join(HOME_DIRECTORY, 'output', 'regression'))
 # Train for each label
 label_names = ['on_off', 'dyskinesia', 'tremor']
 if not RUN_PARALLEL:
-    for model_type in REGRESSORS:
-        for label_name in label_names:
+    for label_name in label_names:
+        for model_type in REGRESSORS:
             train_user_model(Data, label_name, model_type)
 else:
     combinations = list(itertools.product(label_names, REGRESSORS))

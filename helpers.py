@@ -20,6 +20,10 @@ def compute_mean_ci(x):
     return mean_x, stderr_x
 
 
+def feature_selection(x):
+    return
+
+
 def calculate_scores(y_train, y_test, train_classes, test_classes, id_test, preds, probs):
     # Bin probabilities over each diary entry
     y_test_bin, preds_bin, probs_bin = [], [], []
