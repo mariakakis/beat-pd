@@ -8,8 +8,8 @@ import csv
 import synapseclient
 
 RUN_PARALLEL = False
+DEBUG = False
 NUM_THREADS = 3
-DEBUG = True
 RANDOM_SEED = 812
 
 # Training parameters

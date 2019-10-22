@@ -5,20 +5,6 @@ from scipy import stats
 import errno
 
 
-def var_squared_error(y1, y2):
-    return np.var((y1-y2)**2)
-
-
-def var_absolute_error(y1, y2):
-    return np.var(np.abs(y1-y2))
-
-
-def compute_mean_ci(x):
-    mean_x = np.mean(x)
-    stderr_x = scipy.stats.sem(x)
-    return mean_x, stderr_x
-
-
 def calculate_scores(y_train, y_test, train_classes, test_classes, id_test, preds, probs):
     # Bin probabilities over each diary entry
     y_test_bin, preds_bin, probs_bin = [], [], []
@@ -184,3 +170,22 @@ def make_dir(path):
             pass
         else:
             raise
+
+
+def var_squared_error(y1, y2):
+    return np.var((y1-y2)**2)
+
+
+def var_absolute_error(y1, y2):
+    return np.var(np.abs(y1-y2))
+
+
+def compute_mean_ci(x):
+    mean_x = np.mean(x)
+    stderr_x = scipy.stats.sem(x)
+    return mean_x, stderr_x
+
+
+def print_debug(text):
+    if DEBUG:
+        print(text)

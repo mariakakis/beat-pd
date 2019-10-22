@@ -5,7 +5,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, GridSearchCV
 from model_training.ordinal_rf import OrdinalRandomForestClassifier
-from model_training.helpers import calculate_scores, generate_plots
+from model_training.helpers import calculate_scores, generate_plots, print_debug
 import mord
 import xgboost as xgb
 import scipy.stats
@@ -28,7 +28,7 @@ def train_user_classification(data, label_name, model_type):
                                     'macro_mae', 'macro_vae', 'null_macro_mae', 'null_macro_vae'])
     sorted_subjects = sorted(data.subject_id.unique())
     if DEBUG:
-        sorted_subjects = sorted_subjects[:2]
+        sorted_subjects = sorted_subjects[:5]
 
     for subject in sorted_subjects:
         print_debug('--------------')
@@ -153,11 +153,6 @@ def train_user_classification(data, label_name, model_type):
     # Plot results
     generate_plots(results, image_filename, model_type, label_name)
     print('**********************')
-
-
-def print_debug(text):
-    if DEBUG:
-        print(text)
 
 
 def compute_mean_ci(x):

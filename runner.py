@@ -33,8 +33,8 @@ def run_training(syn, cis_or_real, nick_or_sage, data_source):
     # Get all of the metadata into the main data frame
     metadata.set_index('measurement_id', inplace=True)
     data['subject_id'] = data.ID.apply(lambda x: metadata.loc[x, 'subject_id'])
-    data['timestamp'] = data.ID.apply(lambda x: metadata.loc[x, 'timestamp'])
-    data['activity_intensity'] = data.ID.apply(lambda x: metadata.loc[x, 'activity_intensity'])
+    timestamp_colname = 'timestamp' if cis_or_real == 1 else 'reported_timestamp'
+    data['timestamp'] = data.ID.apply(lambda x: metadata.loc[x, timestamp_colname])
     data['dyskinesia'] = data.ID.apply(lambda x: metadata.loc[x, 'dyskinesia'])
     data['on_off'] = data.ID.apply(lambda x: metadata.loc[x, 'on_off'])
     data['tremor'] = data.ID.apply(lambda x: metadata.loc[x, 'tremor'])
