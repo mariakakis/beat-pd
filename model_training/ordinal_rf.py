@@ -15,7 +15,7 @@ class OrdinalRandomForestClassifier(RandomForestClassifier, ClassifierMixin):
         self.unique_class = np.sort(np.unique(y))
         if self.unique_class.shape[0] >= 2:
             for i in range(self.unique_class.shape[0] - 1):
-                # for each k - 1 ordinal value we fit a binary classification problem
+                # for each k - 1 ordinal value we fit a binary model_training problem
                 binary_y = (y > self.unique_class[i]).astype(np.uint8)
                 clf = clone(self.base_clf)
                 clf.fit(x, binary_y)

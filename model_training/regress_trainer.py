@@ -1,23 +1,21 @@
-from sklearn.feature_selection import SelectPercentile, mutual_info_classif
+from sklearn.exceptions import DataConversionWarning
 from sklearn.pipeline import Pipeline
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neural_network import MLPClassifier
+from sklearn.feature_selection import SelectPercentile, mutual_info_regression
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, GridSearchCV
-from classification.ordinal_rf import OrdinalRandomForestClassifier
-import mord
+from sklearn.neural_network import MLPRegressor
 import xgboost as xgb
-import scipy.stats
 from settings import *
-from helpers import calculate_scores, generate_plots
+from model_training.helpers import calculate_scores, generate_plots
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=DataConversionWarning)
 
 
-def train_user_model(data, label_name, model_type):
+def train_user_regression(data, label_name, model_type):
     print('Model:', model_type, ', Label:', label_name)
-    image_filename = os.path.join(HOME_DIRECTORY, 'output', 'classification', '%s_%s.png' % (model_type, label_name))
-    csv_filename = os.path.join(HOME_DIRECTORY, 'output', 'classification', '%s_%s.csv' % (model_type, label_name))
+    image_filename = os.path.join(HOME_DIRECTORY, 'output', 'regression', '%s_%s.png' % (model_type, label_name))
+    csv_filename = os.path.join(HOME_DIRECTORY, 'output', 'regression', '%s_%s.csv' % (model_type, label_name))
     if os.path.exists(image_filename):
         return
 
@@ -74,8 +72,8 @@ def train_user_model(data, label_name, model_type):
             # Separate into features and labels
             x_train = subj_data_train.iloc[:, :-7].values
             x_test = subj_data_test.iloc[:, :-7].values
-            y_train = subj_data_train[label_name].values.astype(np.int)
-            y_test = subj_data_test[label_name].values.astype(np.int)
+            y_train = subj_data_train[label_name].values
+            y_test = subj_data_test[label_name].values
             train_classes, test_classes = np.unique(y_train), np.unique(y_test)
 
             # Make sure that folds don't cut the data in a weird way
@@ -90,26 +88,15 @@ def train_user_model(data, label_name, model_type):
                 continue
 
             # Construct the automatic feature selection method
-            feature_selection = SelectPercentile(mutual_info_classif)
+            feature_selection = SelectPercentile(mutual_info_regression)
             param_grid = {'featsel__percentile': np.arange(25, 101, 25)}
 
             # Construct the base model
-            missing_class = any([k != train_classes[k] for k in range(len(train_classes))])
-            if model_type == CLASSIF_RANDOM_FOREST:
-                base_model = RandomForestClassifier(random_state=RANDOM_SEED)
-                param_grid = {'model__n_estimators': np.arange(10, 51, 10), **param_grid}
-            elif model_type == CLASSIF_XGBOOST:
-                base_model = xgb.XGBClassifier(objective="multi:softprob", random_state=RANDOM_SEED)
-                base_model.set_params(**{'num_class': len(train_classes)})
+            if model_type == REGRESS_XGBOOST:
+                base_model = xgb.XGBRegressor(objective="reg:squarederror", random_state=RANDOM_SEED)
                 param_grid = {'model__n_estimators': np.arange(25, 76, 10), **param_grid}
-            elif model_type == CLASSIF_ORDINAL_RANDOM_FOREST:
-                base_model = OrdinalRandomForestClassifier(random_state=RANDOM_SEED)
-                param_grid = {'model__n_estimators': np.arange(10, 51, 10), **param_grid}
-            elif model_type == CLASSIF_ORDINAL_LOGISTIC:
-                base_model = mord.LogisticSE()
-                param_grid = {'model__alpha': np.logspace(-1, 1, 3), **param_grid}
-            elif model_type == CLASSIF_MLP:
-                base_model = MLPClassifier(max_iter=1000, random_state=RANDOM_SEED)
+            elif model_type == REGRESS_MLP:
+                base_model = MLPRegressor(max_iter=1000, random_state=RANDOM_SEED)
                 num_features = x_train.shape[1]
                 half_x, quart_x = int(num_features/2), int(num_features/4)
                 param_grid = {'model__hidden_layer_sizes': [(half_x), (half_x, quart_x)], **param_grid}
@@ -122,12 +109,6 @@ def train_user_model(data, label_name, model_type):
                 ('model', base_model)
             ])
 
-            # Remap classes to fill in gap if one exists
-            if model_type in (CLASSIF_ORDINAL_RANDOM_FOREST, CLASSIF_ORDINAL_LOGISTIC) \
-                    and missing_class:
-                print_debug('Forced to remap labels')
-                y_train = np.array(list(map(lambda x: np.where(train_classes == x), y_train))).flatten()
-
             # Identify ideal parameters using stratified k-fold cross-validation
             cross_validator = StratifiedKFold(n_splits=PARAM_SEARCH_FOLDS, random_state=RANDOM_SEED)
             grid_search = GridSearchCV(pipeline, param_grid=param_grid, cv=cross_validator)
@@ -138,11 +119,30 @@ def train_user_model(data, label_name, model_type):
             # Fit the model and predict classes
             model.fit(x_train, y_train)
             preds = model.predict(x_test)
-            probs = model.predict_proba(x_test)
+
+            # Compute probs from predicted values
+            probs = np.zeros((len(preds), len(train_classes)))
+            for i, pred in enumerate(preds):
+                prob_vec = np.zeros((len(train_classes),))
+                if pred <= np.min(train_classes):
+                    prob_vec[0] = 1
+                elif pred >= np.max(train_classes):
+                    prob_vec[-1] = 1
+                elif pred in train_classes:
+                    idx = np.where(train_classes == pred)[0]
+                    prob_vec[idx] = 1
+                else:
+                    lower_class_idx = np.max(np.where(pred > train_classes)[0])
+                    upper_class_idx = np.min(np.where(pred < train_classes)[0])
+                    lower_class = train_classes[lower_class_idx]
+                    upper_class = train_classes[upper_class_idx]
+                    prob_vec[lower_class_idx] = upper_class-pred
+                    prob_vec[upper_class_idx] = pred-lower_class
+                probs[i, :] = prob_vec
 
             # Calculate scores and other subject information
             scores = calculate_scores(y_train, y_test, train_classes, test_classes, id_test, preds, probs)
-            result = {'subject_id': subject, 'n_total': len(train_idxs)+len(test_idxs),
+            result = {'subject_id': subject, 'n_total': len(train_idxs) + len(test_idxs),
                       'n_train': len(train_idxs), 'n_test': len(test_idxs),
                       **scores}
             results = results.append(result, ignore_index=True)
@@ -158,10 +158,3 @@ def train_user_model(data, label_name, model_type):
 def print_debug(text):
     if DEBUG:
         print(text)
-
-
-def compute_mean_ci(x):
-    mean_x = np.mean(x)
-    stderr_x = scipy.stats.sem(x)
-    # ci = (mean_x-1.98*stderr_x, mean_x+1.98*stderr_x)
-    return mean_x, stderr_x
