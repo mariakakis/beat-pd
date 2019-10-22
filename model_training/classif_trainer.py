@@ -72,11 +72,14 @@ def train_user_classification(data, label_name, model_type):
             id_test = subj_data_test.ID.values
 
             # Separate into features and labels
-            x_train = subj_data_train.iloc[:, :-7].values
-            x_test = subj_data_test.iloc[:, :-7].values
+            print(subj_data.columns)
+            print(len(subj_data.columns))
+            x_train = subj_data_train.iloc[:, :-6].values
+            x_test = subj_data_test.iloc[:, :-6].values
             y_train = subj_data_train[label_name].values.astype(np.int)
             y_test = subj_data_test[label_name].values.astype(np.int)
             train_classes, test_classes = np.unique(y_train), np.unique(y_test)
+            quit()
 
             # Make sure that folds don't cut the data in a weird way
             if len(train_classes) <= 1:

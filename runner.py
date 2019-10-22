@@ -7,7 +7,13 @@ from model_training.helpers import make_dir
 from model_training.view_distribution import view_distribution
 
 
-def run_training(syn, cis_or_real, nick_or_sage, data_source):
+def run_training(syn):
+    # Get run params
+    cis_or_real = int(input('Dataset: (1) CIS or (2) REAL: '))
+    nick_or_sage = int(input('Feature source: (1) Nick or (2) Sage: '))
+    data_source = int(input('Sensor features: (1) Watch accel, (2) Watch gyro, '
+                            '(3) Phone accel: '))
+
     # Read data files using run params
     data, metadata = None, None
     # CIS PD
@@ -30,10 +36,14 @@ def run_training(syn, cis_or_real, nick_or_sage, data_source):
     if data is None or metadata is None:
         raise ValueError('Not a valid dataset input')
 
+    # Handle specific data formats
+    if cis_or_real == 2 and nick_or_sage == 1 and (data_source == 1 or data_source == 2):
+        data.pop('Unnamed: 0')
+    timestamp_colname = 'timestamp' if cis_or_real == 1 else 'reported_timestamp'
+
     # Get all of the metadata into the main data frame
     metadata.set_index('measurement_id', inplace=True)
     data['subject_id'] = data.ID.apply(lambda x: metadata.loc[x, 'subject_id'])
-    timestamp_colname = 'timestamp' if cis_or_real == 1 else 'reported_timestamp'
     data['timestamp'] = data.ID.apply(lambda x: metadata.loc[x, timestamp_colname])
     data['dyskinesia'] = data.ID.apply(lambda x: metadata.loc[x, 'dyskinesia'])
     data['on_off'] = data.ID.apply(lambda x: metadata.loc[x, 'on_off'])
@@ -41,7 +51,7 @@ def run_training(syn, cis_or_real, nick_or_sage, data_source):
     print('Done processing data')
 
     # View distribution
-    view_distribution(data)
+    # view_distribution(data)
 
     # Make directories
     make_dir(HOME_DIRECTORY)
