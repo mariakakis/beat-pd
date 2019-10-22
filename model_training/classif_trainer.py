@@ -1,14 +1,14 @@
+from settings import *
 from sklearn.feature_selection import SelectPercentile, mutual_info_classif
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, GridSearchCV
 from model_training.ordinal_rf import OrdinalRandomForestClassifier
+from model_training.helpers import calculate_scores, generate_plots
 import mord
 import xgboost as xgb
 import scipy.stats
-from settings import *
-from model_training.helpers import calculate_scores, generate_plots
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -16,8 +16,8 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def train_user_classification(data, label_name, model_type):
     print('Model:', model_type, ', Label:', label_name)
-    image_filename = os.path.join(HOME_DIRECTORY, 'output', 'model_training', '%s_%s.png' % (model_type, label_name))
-    csv_filename = os.path.join(HOME_DIRECTORY, 'output', 'model_training', '%s_%s.csv' % (model_type, label_name))
+    image_filename = os.path.join(HOME_DIRECTORY, 'output', 'classification', '%s_%s.png' % (model_type, label_name))
+    csv_filename = os.path.join(HOME_DIRECTORY, 'output', 'classification', '%s_%s.csv' % (model_type, label_name))
     if os.path.exists(image_filename):
         return
 

@@ -8,4 +8,5 @@
 .idea/vcs.xml
 __pycache__/
 /output/
-/data/
+/synapse_login.py
+.idea/dictionaries/

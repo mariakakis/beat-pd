@@ -5,6 +5,7 @@ import seaborn as sns
 import pandas as pd
 import os
 import csv
+import synapseclient
 
 RUN_PARALLEL = False
 NUM_THREADS = 3

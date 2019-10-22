@@ -1,10 +1,10 @@
+from settings import *
 from sklearn.exceptions import DataConversionWarning
 from sklearn.pipeline import Pipeline
 from sklearn.feature_selection import SelectPercentile, mutual_info_regression
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, GridSearchCV
 from sklearn.neural_network import MLPRegressor
 import xgboost as xgb
-from settings import *
 from model_training.helpers import calculate_scores, generate_plots
 
 import warnings
