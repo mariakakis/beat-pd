@@ -35,10 +35,20 @@ def run_training(syn):
             data = pd.read_csv(syn.get('syn21042208').path, sep='\t')
     if data is None or metadata is None:
         raise ValueError('Not a valid dataset input')
+    print('Valid run params')
 
     # Handle specific data formats
     if cis_or_real == 2 and nick_or_sage == 1 and (data_source == 1 or data_source == 2):
-        data.pop('Unnamed: 0')
+        data = data.drop('Unnamed: 0', axis=1)
+    if nick_or_sage == 2:
+        data = data.drop(['sensor_location', 'sensor', 'measurementType', 'axis', 'window',
+                          'window_start_time', 'window_end_time'], axis=1)
+        data = data.rename(columns={'measurement_id': 'ID'})
+        col_names = data.columns.tolist()
+        col_names = col_names[1:] + col_names[:1]
+        data = data[col_names]
+
+    # Handle specific metadata formats
     timestamp_colname = 'timestamp' if cis_or_real == 1 else 'reported_timestamp'
 
     # Get all of the metadata into the main data frame
