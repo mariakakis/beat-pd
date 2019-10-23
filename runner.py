@@ -25,16 +25,17 @@ if os.path.exists(run_folder):
     settings = pickle.load(open(run_settings_file, 'rb'))
     cis_or_real = settings['cis_or_real']
     feature_source = settings['feature_source']
+    split_structure = settings['split_structure']
     data_source = settings['data_source']
 else:
-    cis_or_real = int(input('Dataset: (1) DATASET_CIS or (2) DATASET_REAL: '))
+    cis_or_real = int(input('Dataset: (1) CIS or (2) REAL: '))
     feature_source = int(input('Feature source: (1) Nick or (2) Phil: '))
     split_structure = int(input('Split structure source: (1) random or (2) Solly: '))
     data_source = int(input('Sensor features: (1) Watch accel, (2) Watch gyro, '
                             '(3) Phone accel: '))
     output = open(run_settings_file, 'wb')
     pickle.dump({'cis_or_real': cis_or_real, 'feature_source': feature_source,
-                 'data_source': data_source}, output)
+                 'split_structure': split_structure, 'data_source': data_source}, output)
     output.close()
 
 # Read data files using run params
@@ -98,23 +99,23 @@ csv_files, img_files = [], []
 if not RUN_PARALLEL:
     for label_name in label_names:
         for model_type in CLASSIFIERS:
-            csv_file, img_file = train_user_classification(data, label_name, model_type, run_id)
+            csv_file, img_file = train_user_classification(data, label_name, model_type, None, run_id)
             csv_files.append(csv_file)
             img_files.append(img_file)
         for model_type in REGRESSORS:
-            csv_file, img_file = train_user_regression(data, label_name, model_type, run_id)
+            csv_file, img_file = train_user_regression(data, label_name, model_type, None, run_id)
             csv_files.append(csv_file)
             img_files.append(img_file)
 else:
     combinations = list(itertools.product(label_names, CLASSIFIERS))
-    results = Parallel(n_jobs=NUM_THREADS)(delayed(train_user_classification)(data, label_name, model_type, run_id)
+    results = Parallel(n_jobs=NUM_THREADS)(delayed(train_user_classification)(data, label_name, model_type, None, run_id)
                                            for (label_name, model_type) in combinations)
     for i in range(len(combinations)):
         csv_files.append(results[i][0])
         img_files.append(results[i][1])
 
     combinations = list(itertools.product(label_names, REGRESSORS))
-    results = Parallel(n_jobs=NUM_THREADS)(delayed(train_user_regression)(data, label_name, model_type, run_id)
+    results = Parallel(n_jobs=NUM_THREADS)(delayed(train_user_regression)(data, label_name, model_type, None, run_id)
                                            for (label_name, model_type) in combinations)
     for i in range(len(combinations)):
         csv_files.append(results[i][0])

@@ -12,7 +12,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=DataConversionWarning)
 
 
-def train_user_regression(data, label_name, model_type, run_id):
+def train_user_regression(data, label_name, model_type, splits, run_id):
     print('Model:', model_type, ', Label:', label_name)
     image_filename = os.path.join(HOME_DIRECTORY, 'output', run_id, '%s_%s.png' % (model_type, label_name))
     csv_filename = os.path.join(HOME_DIRECTORY, 'output', run_id, '%s_%s.csv' % (model_type, label_name))
@@ -56,8 +56,11 @@ def train_user_regression(data, label_name, model_type, run_id):
             print_debug('Not enough data points for that subject')
             continue
 
-        rskf = RepeatedStratifiedKFold(n_splits=NUM_STRATIFIED_FOLDS, n_repeats=NUM_STRATIFIED_ROUNDS, random_state=RANDOM_SEED)
-        for fold_idx, (train_idxs, test_idxs) in enumerate(list(rskf.split(id_table.ID, id_table[label_name]))):
+        # Create folds if needed
+        rskf = RepeatedStratifiedKFold(n_splits=NUM_STRATIFIED_FOLDS,
+                                       n_repeats=NUM_STRATIFIED_ROUNDS, random_state=RANDOM_SEED)
+        folds = list(rskf.split(id_table.ID, id_table[label_name])) if splits is None else splits
+        for fold_idx, (train_idxs, test_idxs) in enumerate(folds):
             print_debug('Round: %d, Fold %d' % (int(fold_idx/NUM_STRATIFIED_FOLDS)+1,
                                                 (fold_idx % NUM_STRATIFIED_FOLDS)+1))
 
