@@ -21,49 +21,46 @@ run_folder = os.path.join(HOME_DIRECTORY, 'output', run_id)
 run_settings_file = os.path.join(run_folder, 'settings.pkl')
 
 # Either load settings or ask for them
-# TODO: can we get a synapse id?
 if os.path.exists(run_folder):
     settings = pickle.load(open(run_settings_file, 'rb'))
     cis_or_real = settings['cis_or_real']
-    nick_or_sage = settings['nick_or_sage']
+    nick_phil_or_solly = settings['nick_phil_or_solly']
     data_source = settings['data_source']
 else:
     cis_or_real = int(input('Dataset: (1) CIS or (2) REAL: '))
-    nick_or_sage = int(input('Feature source: (1) Nick or (2) Sage: '))
+    nick_phil_or_solly = int(input('Feature source: (1) Nick, (2) Phil, (3) Solly: '))
     data_source = int(input('Sensor features: (1) Watch accel, (2) Watch gyro, '
                             '(3) Phone accel: '))
     output = open(run_settings_file, 'wb')
-    pickle.dump({'cis_or_real': cis_or_real, 'nick_or_sage': nick_or_sage,
+    pickle.dump({'cis_or_real': cis_or_real, 'nick_phil_or_solly': nick_phil_or_solly,
                  'data_source': data_source}, output)
     output.close()
 
 # Read data files using run params
 data, metadata = None, None
-# CIS PD
-if cis_or_real == 1:
+if cis_or_real == CIS and nick_phil_or_solly == NICK and data_source == WATCH_ACCEL:
     metadata = syn.tableQuery("select * from syn20489608").asDataFrame()
-    if nick_or_sage == 1 and data_source == 1:
-        data = pd.read_csv(syn.get('syn20712268').path)
-# REAL PD
-elif cis_or_real == 2:
+    data = pd.read_csv(syn.get('syn20712268').path)
+elif cis_or_real == REAL and nick_phil_or_solly == NICK and data_source == WATCH_ACCEL:
     metadata = syn.tableQuery("select * from syn20822276").asDataFrame()
-    if nick_or_sage == 1:
-        if data_source == 1:
-            data = pd.read_csv(syn.get('syn20928640').path)
-        elif data_source == 2:
-            data = pd.read_csv(syn.get('syn20928636').path)
-        elif data_source == 3:
-            data = pd.read_csv(syn.get('syn20928641').path)
-    elif nick_or_sage == 2 and data_source == 1:
-        data = pd.read_csv(syn.get('syn21042208').path, sep='\t')
+    data = pd.read_csv(syn.get('syn20928640').path)
+elif cis_or_real == REAL and nick_phil_or_solly == NICK and data_source == WATCH_GYRO:
+    metadata = syn.tableQuery("select * from syn20822276").asDataFrame()
+    data = pd.read_csv(syn.get('syn20928636').path)
+elif cis_or_real == REAL and nick_phil_or_solly == NICK and data_source == PHONE_ACCEL:
+    metadata = syn.tableQuery("select * from syn20822276").asDataFrame()
+    data = pd.read_csv(syn.get('syn20928641').path)
+elif cis_or_real == REAL and nick_phil_or_solly == PHIL and data_source == WATCH_ACCEL:
+    metadata = syn.tableQuery("select * from syn20822276").asDataFrame()
+    data = pd.read_csv(syn.get('syn21042208').path, sep='\t')
 if data is None or metadata is None:
     raise ValueError('Not a valid dataset input')
 print('Valid run params')
 
 # Handle specific data formats
-if cis_or_real == 2 and nick_or_sage == 1 and (data_source == 1 or data_source == 2):
+if cis_or_real == REAL and nick_phil_or_solly == NICK and (data_source == WATCH_ACCEL or data_source == WATCH_GYRO):
     data = data.drop('Unnamed: 0', axis=1)
-if nick_or_sage == 2:
+elif nick_phil_or_solly == PHIL:
     data = data.drop(['sensor_location', 'sensor', 'measurementType', 'axis', 'window',
                       'window_start_time', 'window_end_time'], axis=1)
     data = data.rename(columns={'measurement_id': 'ID'})
