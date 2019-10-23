@@ -6,6 +6,7 @@ import pandas as pd
 import os
 import csv
 import synapseclient
+import pickle
 
 RUN_PARALLEL = False
 DEBUG = False

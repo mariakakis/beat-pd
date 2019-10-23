@@ -133,7 +133,7 @@ def generate_plots(results, filename, model_type, label_name):
 
     # Create x-ticks
     data_quantity = results[['subject_id', 'n_total']].drop_duplicates()
-    x_ticks = ['%d (%d)' % (subj, quant) for subj, quant in
+    x_ticks = ['%s (%d)' % (subj, quant) for subj, quant in
                zip(data_quantity.subject_id.values, data_quantity.n_total.values)]
 
     # Plot boxplot of AUCs

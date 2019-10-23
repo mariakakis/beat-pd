@@ -14,10 +14,10 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
-def train_user_classification(data, label_name, model_type):
+def train_user_classification(data, label_name, model_type, run_id):
     print('Model:', model_type, ', Label:', label_name)
-    image_filename = os.path.join(HOME_DIRECTORY, 'output', 'classification', '%s_%s.png' % (model_type, label_name))
-    csv_filename = os.path.join(HOME_DIRECTORY, 'output', 'classification', '%s_%s.csv' % (model_type, label_name))
+    image_filename = os.path.join(HOME_DIRECTORY, 'output', run_id, '%s_%s.png' % (model_type, label_name))
+    csv_filename = os.path.join(HOME_DIRECTORY, 'output', run_id, '%s_%s.csv' % (model_type, label_name))
     if os.path.exists(image_filename):
         return
 
@@ -153,6 +153,7 @@ def train_user_classification(data, label_name, model_type):
     # Plot results
     generate_plots(results, image_filename, model_type, label_name)
     print('**********************')
+    return csv_filename, image_filename
 
 
 def compute_mean_ci(x):
