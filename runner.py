@@ -24,43 +24,52 @@ run_settings_file = os.path.join(run_folder, 'settings.pkl')
 if os.path.exists(run_folder):
     settings = pickle.load(open(run_settings_file, 'rb'))
     cis_or_real = settings['cis_or_real']
-    nick_phil_or_solly = settings['nick_phil_or_solly']
+    feature_source = settings['feature_source']
     data_source = settings['data_source']
 else:
-    cis_or_real = int(input('Dataset: (1) CIS or (2) REAL: '))
-    nick_phil_or_solly = int(input('Feature source: (1) Nick, (2) Phil, (3) Solly: '))
+    cis_or_real = int(input('Dataset: (1) DATASET_CIS or (2) DATASET_REAL: '))
+    feature_source = int(input('Feature source: (1) Nick or (2) Phil: '))
+    split_structure = int(input('Split structure source: (1) random or (2) Solly: '))
     data_source = int(input('Sensor features: (1) Watch accel, (2) Watch gyro, '
                             '(3) Phone accel: '))
     output = open(run_settings_file, 'wb')
-    pickle.dump({'cis_or_real': cis_or_real, 'nick_phil_or_solly': nick_phil_or_solly,
+    pickle.dump({'cis_or_real': cis_or_real, 'feature_source': feature_source,
                  'data_source': data_source}, output)
     output.close()
 
 # Read data files using run params
 data, metadata = None, None
-if cis_or_real == CIS and nick_phil_or_solly == NICK and data_source == WATCH_ACCEL:
-    metadata = syn.tableQuery("select * from syn20489608").asDataFrame()
-    data = pd.read_csv(syn.get('syn20712268').path)
-elif cis_or_real == REAL and nick_phil_or_solly == NICK and data_source == WATCH_ACCEL:
+if cis_or_real == DATASET_CIS:
+    # Metadata
+    if split_structure == SPLIT_STRUCTURE_RANDOM:
+        metadata = syn.tableQuery("select * from syn20489608").asDataFrame()
+    elif split_structure == SPLIT_STRUCTURE_SOLLY:
+        metadata = pd.read_csv(syn.get('syn21036470').path)
+
+    # Data
+    if feature_source == FEATURE_SOURCE_NICK and data_source == SENSOR_WATCH_ACCEL:
+        data = pd.read_csv(syn.get('syn20712268').path)
+elif cis_or_real == DATASET_REAL:
+    # Metadata
     metadata = syn.tableQuery("select * from syn20822276").asDataFrame()
-    data = pd.read_csv(syn.get('syn20928640').path)
-elif cis_or_real == REAL and nick_phil_or_solly == NICK and data_source == WATCH_GYRO:
-    metadata = syn.tableQuery("select * from syn20822276").asDataFrame()
-    data = pd.read_csv(syn.get('syn20928636').path)
-elif cis_or_real == REAL and nick_phil_or_solly == NICK and data_source == PHONE_ACCEL:
-    metadata = syn.tableQuery("select * from syn20822276").asDataFrame()
-    data = pd.read_csv(syn.get('syn20928641').path)
-elif cis_or_real == REAL and nick_phil_or_solly == PHIL and data_source == WATCH_ACCEL:
-    metadata = syn.tableQuery("select * from syn20822276").asDataFrame()
-    data = pd.read_csv(syn.get('syn21042208').path, sep='\t')
+
+    # Data
+    if feature_source == FEATURE_SOURCE_NICK and data_source == SENSOR_WATCH_ACCEL:
+        data = pd.read_csv(syn.get('syn20928640').path)
+    elif feature_source == FEATURE_SOURCE_NICK and data_source == SENSOR_WATCH_GYRO:
+        data = pd.read_csv(syn.get('syn20928636').path)
+    elif feature_source == FEATURE_SOURCE_NICK and data_source == SENSOR_PHONE_ACCEL:
+        data = pd.read_csv(syn.get('syn20928641').path)
+    elif feature_source == FEATURE_SOURCE_PHIL and data_source == SENSOR_WATCH_ACCEL:
+        data = pd.read_csv(syn.get('syn21042208').path, sep='\t')
 if data is None or metadata is None:
     raise ValueError('Not a valid dataset input')
 print('Valid run params')
 
 # Handle specific data formats
-if cis_or_real == REAL and nick_phil_or_solly == NICK and (data_source == WATCH_ACCEL or data_source == WATCH_GYRO):
+if cis_or_real == DATASET_REAL and feature_source == FEATURE_SOURCE_NICK and (data_source == SENSOR_WATCH_ACCEL or data_source == SENSOR_WATCH_GYRO):
     data = data.drop('Unnamed: 0', axis=1)
-elif nick_phil_or_solly == PHIL:
+elif feature_source == FEATURE_SOURCE_PHIL:
     data = data.drop(['sensor_location', 'sensor', 'measurementType', 'axis', 'window',
                       'window_start_time', 'window_end_time'], axis=1)
     data = data.rename(columns={'measurement_id': 'ID'})
