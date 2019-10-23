@@ -38,8 +38,9 @@ def train_user_classification(data, label_name, model_type, run_id):
         subj_data = data[data.subject_id == subject].copy()
         subj_data.sort_values(by='timestamp', inplace=True)
 
-        # Remove cases where on_off is not labeled
-        subj_data = subj_data[subj_data.on_off > -1]
+        # Remove cases without a label
+        subj_data = subj_data[~np.isnan(subj_data[label_name])]
+        subj_data = subj_data[subj_data[label_name] >= 0]
 
         # Make a table that just has unique measurement_ids and labels for the user
         id_table = subj_data[['ID', label_name]].drop_duplicates()
