@@ -2,7 +2,7 @@ from settings import *
 from sklearn.exceptions import DataConversionWarning
 from sklearn.pipeline import Pipeline
 from sklearn.feature_selection import SelectPercentile, mutual_info_regression
-from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold, GridSearchCV
+from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from sklearn.neural_network import MLPRegressor
 import xgboost as xgb
 from model_training.helpers import calculate_scores, generate_plots, print_debug
@@ -12,7 +12,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=DataConversionWarning)
 
 
-def train_user_regression(data, label_name, model_type, splits, run_id):
+def train_user_regression(data, label_name, model_type, run_id):
     print('Model:', model_type, ', Label:', label_name)
     image_filename = os.path.join(HOME_DIRECTORY, 'output', run_id, '%s_%s.png' % (model_type, label_name))
     csv_filename = os.path.join(HOME_DIRECTORY, 'output', run_id, '%s_%s.csv' % (model_type, label_name))
@@ -34,7 +34,6 @@ def train_user_regression(data, label_name, model_type, splits, run_id):
 
         # Get data belonging to a specific subject
         subj_data = data[data.subject_id == subject].copy()
-        subj_data.sort_values(by='timestamp', inplace=True)
 
         # Remove cases without a label
         subj_data = subj_data[~np.isnan(subj_data[label_name])]
@@ -56,13 +55,20 @@ def train_user_regression(data, label_name, model_type, splits, run_id):
             print_debug('Not enough data points for that subject')
             continue
 
-        # Create folds if needed
-        rskf = RepeatedStratifiedKFold(n_splits=NUM_STRATIFIED_FOLDS,
-                                       n_repeats=NUM_STRATIFIED_ROUNDS, random_state=RANDOM_SEED)
-        folds = list(rskf.split(id_table.ID, id_table[label_name])) if splits is None else splits
+        # Create folds
+        if subj_data['fold_1'].isnull().any():
+            skf = StratifiedKFold(n_splits=NUM_STRATIFIED_FOLDS, random_state=RANDOM_SEED)
+            folds = list(skf.split(id_table.ID, id_table[label_name]))
+        else:
+            folds = []
+            for fold_idx in range(NUM_STRATIFIED_FOLDS):
+                train_idxs = np.where(subj_data['fold_%d' % fold_idx])[0]
+                test_idxs = np.where(~subj_data['fold_%d' % fold_idx])[0]
+                folds.append((train_idxs, test_idxs))
+
+        # Go through the folds
         for fold_idx, (train_idxs, test_idxs) in enumerate(folds):
-            print_debug('Round: %d, Fold %d' % (int(fold_idx/NUM_STRATIFIED_FOLDS)+1,
-                                                (fold_idx % NUM_STRATIFIED_FOLDS)+1))
+            print_debug('Fold %d' % fold_idx)
 
             # Get measurement_ids for each fold
             id_train_set = id_table.ID.values[train_idxs]
@@ -74,8 +80,8 @@ def train_user_regression(data, label_name, model_type, splits, run_id):
             id_test = subj_data_test.ID.values
 
             # Separate into features and labels
-            x_train = subj_data_train.iloc[:, :-7].values
-            x_test = subj_data_test.iloc[:, :-7].values
+            x_train = subj_data_train.iloc[:, :-(5+NUM_STRATIFIED_FOLDS)].values
+            x_test = subj_data_test.iloc[:, :-(5+NUM_STRATIFIED_FOLDS)].values
             y_train = subj_data_train[label_name].values
             y_test = subj_data_test[label_name].values
             train_classes, test_classes = np.unique(y_train), np.unique(y_test)
