@@ -39,13 +39,14 @@ def preprocess_data(id_table, subject, label_name):
     return subj_id_table, folds
 
 
-def calculate_scores(y_train, y_test, train_classes, test_classes, id_test, preds, probs):
+def calculate_scores(y_train, y_test, train_classes, test_classes, subj_data_test, preds, probs):
     # Bin probabilities over each diary entry
     y_test_bin, preds_bin, probs_bin = [], [], []
-    for ID in np.unique(id_test):
-        y_test_bin.append(np.mean(y_test[id_test == ID]))
-        preds_bin.append(np.mean(preds[id_test == ID]))
-        probs_bin.append(np.mean(probs[id_test == ID, :], axis=0).reshape([1, -1]))
+    test_data_ids = subj_data_test['ID']
+    for ID in np.unique(test_data_ids):
+        y_test_bin.append(np.mean(y_test[test_data_ids == ID]))
+        preds_bin.append(np.mean(preds[test_data_ids == ID]))
+        probs_bin.append(np.mean(probs[test_data_ids == ID, :], axis=0).reshape([1, -1]))
     y_test_bin = np.vstack(y_test_bin)
     preds_bin = np.vstack(preds_bin)
     probs_bin = np.vstack(probs_bin)

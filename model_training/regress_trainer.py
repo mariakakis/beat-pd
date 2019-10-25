@@ -38,12 +38,12 @@ def train_user_regression(data, id_table, label_name, model_type, run_id):
             continue
 
         # Go through the folds
-        for fold_idx, (train_idxs, test_idxs) in enumerate(folds):
+        for fold_idx, (id_table_train_idxs, id_table_test_idxs) in enumerate(folds):
             print_debug('Fold %d' % fold_idx)
 
             # Separate train and test IDs
-            subj_id_table_train = subj_id_table.iloc[train_idxs, :]
-            subj_id_table_test = subj_id_table.iloc[test_idxs, :]
+            subj_id_table_train = subj_id_table.iloc[id_table_train_idxs, :]
+            subj_id_table_test = subj_id_table.iloc[id_table_test_idxs, :]
             id_train = subj_id_table_train['ID'].values
             id_test = subj_id_table_test['ID'].values
 
@@ -127,9 +127,9 @@ def train_user_regression(data, id_table, label_name, model_type, run_id):
                 probs[i, :] = prob_vec
 
             # Calculate scores and other subject information
-            scores = calculate_scores(y_train, y_test, train_classes, test_classes, id_test, preds, probs)
-            result = {'subject_id': subject, 'n_total': len(train_idxs) + len(test_idxs),
-                      'n_train': len(train_idxs), 'n_test': len(test_idxs),
+            scores = calculate_scores(y_train, y_test, train_classes, test_classes, subj_data_test, preds, probs)
+            result = {'subject_id': subject, 'n_total': len(id_table_train_idxs) + len(id_table_test_idxs),
+                      'n_train': len(id_table_train_idxs), 'n_test': len(id_table_test_idxs),
                       **scores}
             results = results.append(result, ignore_index=True)
 

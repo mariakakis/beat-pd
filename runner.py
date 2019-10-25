@@ -76,9 +76,9 @@ if feature_source == FEATURE_SOURCE_PHIL:
     col_names = col_names[1:] + col_names[:1]
     data = data[col_names]
 if 'measurement_id' in data.columns:
-    data = data.rename(columns={'measurement_id': 'ID'})
+    data = data.replace('measurement_id', 'ID')
 if 'measurement_id' in metadata.columns:
-    metadata = metadata.rename(columns={'measurement_id': 'ID'})
+    metadata = metadata.replace('measurement_id', 'ID')
 
 # Only extract desired metadata columns
 id_table = metadata[['ID', 'subject_id', 'dyskinesia', 'on_off', 'tremor']].drop_duplicates()
@@ -96,6 +96,7 @@ for fold_idx in range(NUM_STRATIFIED_FOLDS):
 print('Done processing data')
 
 # View distribution
+# TODO: this is broken
 # view_distribution(data)
 
 # Train model for each label
