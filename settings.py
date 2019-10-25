@@ -8,7 +8,6 @@ import csv
 import synapseclient
 import pickle
 
-RUN_PARALLEL = False
 DEBUG = False
 NUM_THREADS = 3
 RANDOM_SEED = 812
@@ -16,13 +15,15 @@ RANDOM_SEED = 812
 # Training parameters
 MIN_OBSERVATIONS_PER_SUBJECT = 40
 MIN_OBSERVATIONS_PER_CLASS = 2
-NUM_STRATIFIED_FOLDS = 10 if not DEBUG else 2
+NUM_STRATIFIED_FOLDS = 5 if not DEBUG else 2
 PARAM_SEARCH_FOLDS = 5 if not DEBUG else 2
 
 if os.name == 'nt':
     HOME_DIRECTORY = os.path.join('C:\\', 'Users', 'atm15.CSENETID', 'Desktop', 'beat-pd')
+    RUN_PARALLEL = True
 else:
     HOME_DIRECTORY = os.path.join('/Users', 'alex', 'Desktop', 'beat-pd')
+    RUN_PARALLEL = False
 
 # Classifiers
 CLASSIF_RANDOM_FOREST = 'classif-rf'

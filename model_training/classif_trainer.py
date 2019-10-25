@@ -5,7 +5,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from model_training.ordinal_rf import OrdinalRandomForestClassifier
-from model_training.helpers import calculate_scores, generate_plots, print_debug
+from model_training.helpers import preprocess_data, calculate_scores, generate_plots, print_debug
 import mord
 import xgboost as xgb
 import scipy.stats
@@ -14,7 +14,7 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
-def train_user_classification(data, label_name, model_type, run_id):
+def train_user_classification(data, id_table, label_name, model_type, run_id):
     print('Model:', model_type, ', Label:', label_name)
     image_filename = os.path.join(HOME_DIRECTORY, 'output', run_id, '%s_%s.png' % (model_type, label_name))
     csv_filename = os.path.join(HOME_DIRECTORY, 'output', run_id, '%s_%s.csv' % (model_type, label_name))
@@ -26,7 +26,7 @@ def train_user_classification(data, label_name, model_type, run_id):
                                     'mae', 'vae', 'null_mae', 'null_vae',
                                     'macro_mse', 'macro_vse', 'null_macro_mse', 'null_macro_vse',
                                     'macro_mae', 'macro_vae', 'null_macro_mae', 'null_macro_vae'])
-    sorted_subjects = sorted(data.subject_id.unique())
+    sorted_subjects = sorted(id_table.subject_id.unique())
     if DEBUG:
         sorted_subjects = sorted_subjects[:5]
 
@@ -34,56 +34,32 @@ def train_user_classification(data, label_name, model_type, run_id):
         print_debug('--------------')
         print('Subject: %s' % subject)
 
-        # Get data belonging to a specific subject
-        subj_data = data[data.subject_id == subject].copy()
-
-        # Remove cases without a label
-        subj_data = subj_data[~np.isnan(subj_data[label_name])]
-        subj_data = subj_data[subj_data[label_name] >= 0]
-
-        # Make a table that just has unique measurement_ids and labels for the user
-        id_table = subj_data[['ID', label_name]].drop_duplicates()
-
-        # Remove any classes with not enough samples
-        label_counts = id_table[label_name].value_counts()
-        for i in range(len(label_counts)):
-            if i in label_counts and label_counts[i] <= MIN_OBSERVATIONS_PER_CLASS:
-                subj_data = subj_data[subj_data[label_name] != i]
-                id_table = id_table[id_table[label_name] != i]
-                print_debug('Removing class %d from this user' % i)
-
-        # Skip if not enough data left over
-        if len(id_table) <= MIN_OBSERVATIONS_PER_SUBJECT:
-            print_debug('Not enough data points for that subject')
+        # Isolate this subject's data and generate folds, skipping if not enough data
+        subj_id_table, folds = preprocess_data(id_table, subject, label_name)
+        if subj_id_table is None:
             continue
-
-        # Create folds
-        if subj_data['fold_1'].isnull().any():
-            skf = StratifiedKFold(n_splits=NUM_STRATIFIED_FOLDS, random_state=RANDOM_SEED)
-            folds = list(skf.split(id_table.ID, id_table[label_name]))
-        else:
-            folds = []
-            for fold_idx in range(NUM_STRATIFIED_FOLDS):
-                train_idxs = np.where(subj_data['fold_%d' % fold_idx])[0]
-                test_idxs = np.where(~subj_data['fold_%d' % fold_idx])[0]
-                folds.append((train_idxs, test_idxs))
 
         # Go through the folds
         for fold_idx, (train_idxs, test_idxs) in enumerate(folds):
             print_debug('Fold %d' % fold_idx)
 
-            # Get measurement_ids for each fold
-            id_train_set = id_table.ID.values[train_idxs]
-            id_test_set = id_table.ID.values[test_idxs]
+            # Separate train and test IDs
+            subj_id_table_train = subj_id_table.iloc[train_idxs, :]
+            subj_id_table_test = subj_id_table.iloc[test_idxs, :]
+            id_train = subj_id_table_train['ID'].values
+            id_test = subj_id_table_test['ID'].values
 
-            # Separate train and test
-            subj_data_train = subj_data[subj_data['ID'].isin(id_train_set)]
-            subj_data_test = subj_data[subj_data['ID'].isin(id_test_set)]
-            id_test = subj_data_test.ID.values
+            # Grab corresponding data
+            subj_data_train = data[data['ID'].isin(id_train)]
+            subj_data_test = data[data['ID'].isin(id_test)]
+
+            # Add labels to the data
+            subj_data_train = pd.merge(subj_data_train, subj_id_table_train[['ID', label_name]], on='ID', how='left')
+            subj_data_test = pd.merge(subj_data_test, subj_id_table_test[['ID', label_name]], on='ID', how='left')
 
             # Separate into features and labels
-            x_train = subj_data_train.iloc[:, :-(5+NUM_STRATIFIED_FOLDS)].values
-            x_test = subj_data_test.iloc[:, :-(5+NUM_STRATIFIED_FOLDS)].values
+            x_train = subj_data_train.drop(['ID', label_name], axis=1).values
+            x_test = subj_data_test.drop(['ID', label_name], axis=1).values
             y_train = subj_data_train[label_name].values.astype(np.int)
             y_test = subj_data_test[label_name].values.astype(np.int)
             train_classes, test_classes = np.unique(y_train), np.unique(y_test)

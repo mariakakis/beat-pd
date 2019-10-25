@@ -1,8 +1,42 @@
 from settings import *
+from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import roc_auc_score, mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import label_binarize
 from scipy import stats
 import errno
+
+
+def preprocess_data(id_table, subject, label_name):
+    # Get data belonging to a specific subject
+    subj_id_table = id_table[id_table.subject_id == subject].copy()
+
+    # Remove cases without a label
+    subj_id_table = subj_id_table[~np.isnan(subj_id_table[label_name])]
+    subj_id_table = subj_id_table[subj_id_table[label_name] >= 0]
+
+    # Remove any classes with not enough samples
+    label_counts = subj_id_table[label_name].value_counts()
+    for i in range(len(label_counts)):
+        if i in label_counts and label_counts[i] <= MIN_OBSERVATIONS_PER_CLASS:
+            subj_id_table = subj_id_table[subj_id_table[label_name] != i]
+            print_debug('Removing class %d from this user' % i)
+
+    # Skip if not enough data left over
+    if len(subj_id_table) <= MIN_OBSERVATIONS_PER_SUBJECT:
+        print_debug('Not enough data points for that subject')
+        return None, None
+
+    # Create folds
+    if subj_id_table['fold_1'].isnull().any():
+        skf = StratifiedKFold(n_splits=NUM_STRATIFIED_FOLDS, random_state=RANDOM_SEED)
+        folds = list(skf.split(subj_id_table.ID, subj_id_table[label_name]))
+    else:
+        folds = []
+        for fold_idx in range(NUM_STRATIFIED_FOLDS):
+            train_idxs = np.where(subj_id_table['fold_%d' % fold_idx])[0]
+            test_idxs = np.where(~subj_id_table['fold_%d' % fold_idx])[0]
+            folds.append((train_idxs, test_idxs))
+    return subj_id_table, folds
 
 
 def calculate_scores(y_train, y_test, train_classes, test_classes, id_test, preds, probs):

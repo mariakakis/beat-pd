@@ -4,7 +4,6 @@ from model_training.regress_trainer import train_user_regression
 from joblib import Parallel, delayed
 import itertools
 from model_training.helpers import make_dir
-from synapseclient import File
 from model_training.view_distribution import view_distribution
 
 # Login to synapse
@@ -73,25 +72,27 @@ if cis_or_real == DATASET_REAL and feature_source == FEATURE_SOURCE_NICK and \
 if feature_source == FEATURE_SOURCE_PHIL:
     data = data.drop(['sensor_location', 'sensor', 'measurementType', 'axis', 'window',
                       'window_start_time', 'window_end_time'], axis=1)
-    data = data.rename(columns={'measurement_id': 'ID'})
     col_names = data.columns.tolist()
     col_names = col_names[1:] + col_names[:1]
     data = data[col_names]
+if 'measurement_id' in data.columns:
+    data = data.rename(columns={'measurement_id': 'ID'})
+if 'measurement_id' in metadata.columns:
+    metadata = metadata.rename(columns={'measurement_id': 'ID'})
+
+# Only extract desired metadata columns
+id_table = metadata[['ID', 'subject_id', 'dyskinesia', 'on_off', 'tremor']].drop_duplicates()
 
 # Remove cases when measurement_id is in data but not meta
-metadata.set_index('measurement_id', inplace=True)
+metadata.set_index('ID', inplace=True)
 data = data[data['ID'].isin(metadata.index)]
 
 # Get all of the metadata into the main data frame
-data['subject_id'] = data.ID.apply(lambda x: metadata.loc[x, 'subject_id'])
-data['dyskinesia'] = data.ID.apply(lambda x: metadata.loc[x, 'dyskinesia'])
-data['on_off'] = data.ID.apply(lambda x: metadata.loc[x, 'on_off'])
-data['tremor'] = data.ID.apply(lambda x: metadata.loc[x, 'tremor'])
 for fold_idx in range(NUM_STRATIFIED_FOLDS):
     if split_structure == SPLIT_STRUCTURE_DEFINED:
-        data['fold_%d' % fold_idx] = data.ID.apply(lambda x: metadata.loc[x, 'training%d' % (fold_idx+1)])
+        id_table['fold_%d' % fold_idx] = id_table['ID'].apply(lambda x: metadata.loc[x, 'training%d' % (fold_idx+1)])
     elif split_structure == SPLIT_STRUCTURE_RANDOM:
-        data['fold_%d' % fold_idx] = np.nan
+        id_table['fold_%d' % fold_idx] = np.nan
 print('Done processing data')
 
 # View distribution
@@ -103,23 +104,23 @@ csv_files, img_files = [], []
 if not RUN_PARALLEL:
     for label_name in label_names:
         for model_type in CLASSIFIERS:
-            csv_file, img_file = train_user_classification(data, label_name, model_type, run_id)
+            csv_file, img_file = train_user_classification(data, id_table, label_name, model_type, run_id)
             csv_files.append(csv_file)
             img_files.append(img_file)
         for model_type in REGRESSORS:
-            csv_file, img_file = train_user_regression(data, label_name, model_type, run_id)
+            csv_file, img_file = train_user_regression(data, id_table, label_name, model_type, run_id)
             csv_files.append(csv_file)
             img_files.append(img_file)
 else:
     combinations = list(itertools.product(label_names, CLASSIFIERS))
-    results = Parallel(n_jobs=NUM_THREADS)(delayed(train_user_classification)(data, label_name, model_type, run_id)
+    results = Parallel(n_jobs=NUM_THREADS)(delayed(train_user_classification)(data, id_table, label_name, model_type, run_id)
                                            for (label_name, model_type) in combinations)
     for i in range(len(combinations)):
         csv_files.append(results[i][0])
         img_files.append(results[i][1])
 
     combinations = list(itertools.product(label_names, REGRESSORS))
-    results = Parallel(n_jobs=NUM_THREADS)(delayed(train_user_regression)(data, label_name, model_type, run_id)
+    results = Parallel(n_jobs=NUM_THREADS)(delayed(train_user_regression)(data, id_table, label_name, model_type, run_id)
                                            for (label_name, model_type) in combinations)
     for i in range(len(combinations)):
         csv_files.append(results[i][0])
