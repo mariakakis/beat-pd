@@ -4,7 +4,6 @@ from model_training.regress_trainer import train_user_regression
 from joblib import Parallel, delayed
 import itertools
 from model_training.helpers import make_dir
-from model_training.view_distribution import view_distribution
 
 # Login to synapse
 syn = synapseclient.Synapse()
@@ -76,9 +75,9 @@ if feature_source == FEATURE_SOURCE_PHIL:
     col_names = col_names[1:] + col_names[:1]
     data = data[col_names]
 if 'measurement_id' in data.columns:
-    data = data.replace('measurement_id', 'ID')
+    data = data.rename(columns={'measurement_id': 'ID'})
 if 'measurement_id' in metadata.columns:
-    metadata = metadata.replace('measurement_id', 'ID')
+    metadata = metadata.rename(columns={'measurement_id': 'ID'})
 
 # Only extract desired metadata columns
 id_table = metadata[['ID', 'subject_id', 'dyskinesia', 'on_off', 'tremor']].drop_duplicates()
@@ -94,10 +93,6 @@ for fold_idx in range(NUM_STRATIFIED_FOLDS):
     elif split_structure == SPLIT_STRUCTURE_RANDOM:
         id_table['fold_%d' % fold_idx] = np.nan
 print('Done processing data')
-
-# View distribution
-# TODO: this is broken
-# view_distribution(data)
 
 # Train model for each label
 label_names = ['on_off', 'dyskinesia', 'tremor']

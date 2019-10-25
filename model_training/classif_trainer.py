@@ -34,7 +34,7 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
         print_debug('--------------')
         print('Subject: %s' % subject)
 
-        # Isolate this subject's data and generate folds, skipping if not enough data
+        # Filter subject's data and generate folds, skipping if not enough data
         subj_id_table, folds = preprocess_data(id_table, subject, label_name)
         if subj_id_table is None:
             continue
