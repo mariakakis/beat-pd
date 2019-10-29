@@ -1,11 +1,13 @@
 from settings import *
 from sklearn.feature_selection import SelectPercentile, mutual_info_classif
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import Pipeline, make_union
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from model_training.ordinal_rf import OrdinalRandomForestClassifier
 from model_training.helpers import preprocess_data, calculate_scores, generate_plots, print_debug
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer, MissingIndicator
 import mord
 import xgboost as xgb
 import scipy.stats
@@ -75,6 +77,10 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
                 print_debug('There is a test class that is not in train')
                 continue
 
+            # Prepare data imputer for missing data
+            imputer = IterativeImputer(random_state=RANDOM_SEED,
+                                       n_nearest_features=5)
+
             # Construct the automatic feature selection method
             feature_selection = SelectPercentile(mutual_info_classif)
             param_grid = {'featsel__percentile': np.arange(25, 101, 25)}
@@ -104,6 +110,7 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
 
             # Create a pipeline
             pipeline = Pipeline([
+                ('imputer', make_union(imputer, MissingIndicator())),
                 ('featsel', feature_selection),
                 ('model', base_model)
             ])
