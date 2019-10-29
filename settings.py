@@ -8,7 +8,7 @@ import csv
 import synapseclient
 import pickle
 
-DEBUG = True
+DEBUG = False
 NUM_THREADS = 3
 RANDOM_SEED = 812
 
