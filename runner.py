@@ -3,7 +3,7 @@ from model_training.classif_trainer import train_user_classification
 from model_training.regress_trainer import train_user_regression
 from joblib import Parallel, delayed
 import itertools
-from model_training.helpers import make_dir
+from model_training.helpers import make_dir, combine_data
 
 # Login to synapse
 syn = synapseclient.Synapse()
@@ -28,7 +28,7 @@ else:
     feature_source = int(input('Feature source: (1) Nick or (2) Phil: '))
     split_structure = int(input('Split structure source: (1) random or (2) pre-defined: '))
     data_source = int(input('Sensor features: (1) Watch accel, (2) Watch gyro, '
-                            '(3) Phone accel: '))
+                            '(3) Phone accel, (4) All: ')) # TODO: remove 2 and 3
     make_dir(run_folder)
     output = open(run_settings_file, 'wb')
     pickle.dump({'cis_or_real': cis_or_real, 'feature_source': feature_source,
@@ -58,6 +58,11 @@ elif cis_or_real == DATASET_REAL:
         data = pd.read_csv(syn.get('syn20928636').path)
     elif feature_source == FEATURE_SOURCE_NICK and data_source == SENSOR_PHONE_ACCEL:
         data = pd.read_csv(syn.get('syn20928641').path)
+    elif feature_source == FEATURE_SOURCE_NICK and data_source == SENSOR_ALL:
+        watch_accel_data = pd.read_csv(syn.get('syn20928640').path)
+        watch_gyro_data = pd.read_csv(syn.get('syn20928636').path)
+        phone_accel_data = pd.read_csv(syn.get('syn20928641').path)
+        data = combine_data(watch_accel_data, watch_gyro_data, phone_accel_data)
     elif feature_source == FEATURE_SOURCE_PHIL and data_source == SENSOR_WATCH_ACCEL:
         data = pd.read_csv(syn.get('syn21042208').path, sep='\t')
 if data is None or metadata is None:
@@ -86,12 +91,12 @@ id_table = metadata[['ID', 'subject_id', 'dyskinesia', 'on_off', 'tremor']].drop
 metadata.set_index('ID', inplace=True)
 data = data[data['ID'].isin(metadata.index)]
 
-# Get all of the metadata into the main data frame
-for fold_idx in range(NUM_STRATIFIED_FOLDS):
-    if split_structure == SPLIT_STRUCTURE_DEFINED:
-        id_table['fold_%d' % fold_idx] = id_table['ID'].apply(lambda x: metadata.loc[x, 'training%d' % (fold_idx+1)])
-    elif split_structure == SPLIT_STRUCTURE_RANDOM:
-        id_table['fold_%d' % fold_idx] = np.nan
+# Encode split information
+if split_structure == SPLIT_STRUCTURE_DEFINED:
+    meta_col_list = metadata.columns.tolist()
+    num_folds = len(list(filter(lambda x: x.startswith('training'), meta_col_list)))
+    for fold_idx in range(num_folds):
+        id_table['fold_%d' % fold_idx] = id_table['ID'].apply(lambda x: metadata.loc[x, 'training%d' % (fold_idx + 1)])
 print('Done processing data')
 
 # Train model for each label

@@ -1,9 +1,26 @@
 from settings import *
 from sklearn.model_selection import StratifiedKFold
+from sklearn.neighbors import KNeighborsRegressor
 from sklearn.metrics import roc_auc_score, mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import label_binarize
 from scipy import stats
 import errno
+
+
+def combine_data(watch_accel, watch_gyro, phone_accel):
+    # Rename features for different sources
+
+
+    # Join based on measurement id
+    data = pd.merge(watch_accel, watch_gyro, on='ID', how='left')
+    print('merge1 done')
+    data = pd.merge(data, phone_accel, on='ID', how='left')
+    print(data.columns)
+    # TODO: find feature columns with complete data
+    quit()
+    # TODO: train model with those columns
+    # TODO: impute others using nearest neighbors
+    return
 
 
 def preprocess_data(id_table, subject, label_name):
@@ -27,15 +44,17 @@ def preprocess_data(id_table, subject, label_name):
         return None, None
 
     # Create folds
-    if subj_id_table['fold_1'].isnull().any():
-        skf = StratifiedKFold(n_splits=NUM_STRATIFIED_FOLDS, random_state=RANDOM_SEED)
-        folds = list(skf.split(subj_id_table.ID, subj_id_table[label_name]))
-    else:
+    if any([col.startswith('fold') for col in subj_id_table.columns.tolist()]):
         folds = []
-        for fold_idx in range(NUM_STRATIFIED_FOLDS):
+        num_folds = len(list(filter(lambda x: x.startswith('fold'), subj_id_table.columns.tolist())))
+        for fold_idx in range(num_folds):
             train_idxs = np.where(subj_id_table['fold_%d' % fold_idx])[0]
             test_idxs = np.where(~subj_id_table['fold_%d' % fold_idx])[0]
             folds.append((train_idxs, test_idxs))
+    else:
+        skf = StratifiedKFold(n_splits=NUM_STRATIFIED_FOLDS, random_state=RANDOM_SEED)
+        folds = list(skf.split(subj_id_table.ID, subj_id_table[label_name]))
+
     return subj_id_table, folds
 
 
