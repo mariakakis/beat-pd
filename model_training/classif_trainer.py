@@ -21,7 +21,7 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
     if os.path.exists(image_filename):
         return
 
-    results = pd.DataFrame(columns=['subject_id', 'n_total', 'n_train', 'n_test', 'auc',
+    results = pd.DataFrame(columns=['subject_id', 'split_id', 'n_total', 'n_train', 'n_test', 'auc',
                                     'mse', 'vse', 'null_mse', 'null_vse',
                                     'mae', 'vae', 'null_mae', 'null_vae',
                                     'macro_mse', 'macro_vse', 'null_macro_mse', 'null_macro_vse',
@@ -128,7 +128,7 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
 
             # Calculate scores and other subject information
             scores = calculate_scores(y_train, y_test, train_classes, test_classes, subj_data_test, preds, probs)
-            result = {'subject_id': subject, 'n_total': len(id_table_train_idxs)+len(id_table_test_idxs),
+            result = {'subject_id': subject, 'split_id': fold_idx, 'n_total': len(id_table_train_idxs)+len(id_table_test_idxs),
                       'n_train': len(id_table_train_idxs), 'n_test': len(id_table_test_idxs),
                       **scores}
             results = results.append(result, ignore_index=True)
