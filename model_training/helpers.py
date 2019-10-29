@@ -1,6 +1,5 @@
 from settings import *
 from sklearn.model_selection import StratifiedKFold
-from sklearn.neighbors import KNeighborsRegressor
 from sklearn.metrics import roc_auc_score, mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import label_binarize
 from scipy import stats
@@ -17,6 +16,7 @@ def combine_data(watch_accel, watch_gyro, phone_accel):
     data = pd.merge(watch_accel, watch_gyro, on='ID', how='left')
     data = pd.merge(data, phone_accel, on='ID', how='left')
     data = data.loc[:, ~data.columns.duplicated()]
+    print_debug('Done merging data')
 
     return data
 
@@ -31,14 +31,15 @@ def preprocess_data(id_table, subject, label_name):
 
     # Remove any classes with not enough samples
     label_counts = subj_id_table[label_name].value_counts()
-    for i in range(len(label_counts)):
-        if i in label_counts and label_counts[i] <= MIN_OBSERVATIONS_PER_CLASS:
-            subj_id_table = subj_id_table[subj_id_table[label_name] != i]
-            print_debug('Removing class %d from this user' % i)
 
-    # Skip if not enough data left over
-    if len(subj_id_table) <= MIN_OBSERVATIONS_PER_SUBJECT:
-        print_debug('Not enough data points for that subject')
+    # Skip if not enough data overall
+    if label_counts.sum() < 40:
+        print_debug('Not enough data points for this subject')
+        return None, None
+
+    # Skip if not enough variance in data
+    if not (label_counts.gt(10).sum() >= 2 or label_counts.gt(5).sum() >= 5):
+        print_debug('Not enough diversity in the data for this subject')
         return None, None
 
     # Create folds
