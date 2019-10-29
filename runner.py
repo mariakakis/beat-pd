@@ -28,7 +28,7 @@ else:
     feature_source = int(input('Feature source: (1) Nick or (2) Phil: '))
     split_structure = int(input('Split structure source: (1) random or (2) pre-defined: '))
     data_source = int(input('Sensor features: (1) Watch accel, (2) Watch gyro, '
-                            '(3) Phone accel, (4) All: ')) # TODO: remove 2 and 3
+                            '(3) Phone accel, (4) All: '))
     make_dir(run_folder)
     output = open(run_settings_file, 'wb')
     pickle.dump({'cis_or_real': cis_or_real, 'feature_source': feature_source,
@@ -47,6 +47,8 @@ if cis_or_real == DATASET_CIS:
     # Data
     if feature_source == FEATURE_SOURCE_NICK and data_source == SENSOR_WATCH_ACCEL:
         data = pd.read_csv(syn.get('syn20712268').path)
+    elif feature_source == FEATURE_SOURCE_PHIL and data_source == SENSOR_WATCH_ACCEL:
+        data = pd.read_csv(syn.get('syn21042208').path, sep='\t')
 elif cis_or_real == DATASET_REAL:
     # Metadata
     metadata = syn.tableQuery("select * from syn20822276").asDataFrame()
@@ -54,25 +56,26 @@ elif cis_or_real == DATASET_REAL:
     # Data
     if feature_source == FEATURE_SOURCE_NICK and data_source == SENSOR_WATCH_ACCEL:
         data = pd.read_csv(syn.get('syn20928640').path)
+        data = data.drop('Unnamed: 0', axis=1)
     elif feature_source == FEATURE_SOURCE_NICK and data_source == SENSOR_WATCH_GYRO:
         data = pd.read_csv(syn.get('syn20928636').path)
+        data = data.drop('Unnamed: 0', axis=1)
     elif feature_source == FEATURE_SOURCE_NICK and data_source == SENSOR_PHONE_ACCEL:
         data = pd.read_csv(syn.get('syn20928641').path)
     elif feature_source == FEATURE_SOURCE_NICK and data_source == SENSOR_ALL:
         watch_accel_data = pd.read_csv(syn.get('syn20928640').path)
+        watch_accel_data = watch_accel_data.drop('Unnamed: 0', axis=1)
         watch_gyro_data = pd.read_csv(syn.get('syn20928636').path)
+        watch_gyro_data = watch_gyro_data.drop('Unnamed: 0', axis=1)
         phone_accel_data = pd.read_csv(syn.get('syn20928641').path)
         data = combine_data(watch_accel_data, watch_gyro_data, phone_accel_data)
     elif feature_source == FEATURE_SOURCE_PHIL and data_source == SENSOR_WATCH_ACCEL:
-        data = pd.read_csv(syn.get('syn21042208').path, sep='\t')
+        data = pd.read_csv(syn.get('syn21071367').path, sep='\t')
 if data is None or metadata is None:
     raise ValueError('Not a valid dataset input')
 print('Valid run params')
 
 # Handle specific data formats
-if cis_or_real == DATASET_REAL and feature_source == FEATURE_SOURCE_NICK and \
-        (data_source == SENSOR_WATCH_ACCEL or data_source == SENSOR_WATCH_GYRO):
-    data = data.drop('Unnamed: 0', axis=1)
 if feature_source == FEATURE_SOURCE_PHIL:
     data = data.drop(['sensor_location', 'sensor', 'measurementType', 'axis', 'window',
                       'window_start_time', 'window_end_time'], axis=1)
@@ -80,9 +83,9 @@ if feature_source == FEATURE_SOURCE_PHIL:
     col_names = col_names[1:] + col_names[:1]
     data = data[col_names]
 if 'measurement_id' in data.columns:
-    data = data.rename(columns={'measurement_id': 'ID'})
+    data.rename(columns={'measurement_id': 'ID'}, inplace=True)
 if 'measurement_id' in metadata.columns:
-    metadata = metadata.rename(columns={'measurement_id': 'ID'})
+    metadata.rename(columns={'measurement_id': 'ID'}, inplace=True)
 
 # Only extract desired metadata columns
 id_table = metadata[['ID', 'subject_id', 'dyskinesia', 'on_off', 'tremor']].drop_duplicates()

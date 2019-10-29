@@ -8,19 +8,17 @@ import errno
 
 
 def combine_data(watch_accel, watch_gyro, phone_accel):
-    # Rename features for different sources
-
+    # Rename columns
+    watch_accel.rename(columns=lambda x: '%s_watchaccel' % x if x != 'ID' else x, inplace=True)
+    watch_gyro.rename(columns=lambda x: '%s_watchgyro' % x if x != 'ID' else x, inplace=True)
+    phone_accel.rename(columns=lambda x: '%s_phoneaccel' % x if x != 'ID' else x, inplace=True)
 
     # Join based on measurement id
     data = pd.merge(watch_accel, watch_gyro, on='ID', how='left')
-    print('merge1 done')
     data = pd.merge(data, phone_accel, on='ID', how='left')
-    print(data.columns)
-    # TODO: find feature columns with complete data
-    quit()
-    # TODO: train model with those columns
-    # TODO: impute others using nearest neighbors
-    return
+    data = data.loc[:, ~data.columns.duplicated()]
+
+    return data
 
 
 def preprocess_data(id_table, subject, label_name):
