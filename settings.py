@@ -9,7 +9,7 @@ import synapseclient
 import pickle
 
 DEBUG = False
-NUM_THREADS = 3
+NUM_THREADS = 2
 RANDOM_SEED = 812
 
 # Training parameters

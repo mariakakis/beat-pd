@@ -65,10 +65,10 @@ elif cis_or_real == DATASET_REAL:
     elif feature_source == FEATURE_SOURCE_NICK and data_source == SENSOR_ALL:
         watch_accel_data = pd.read_csv(syn.get('syn20928640').path)
         watch_accel_data = watch_accel_data.drop('Unnamed: 0', axis=1)
-        watch_gyro_data = pd.read_csv(syn.get('syn20928636').path)
-        watch_gyro_data = watch_gyro_data.drop('Unnamed: 0', axis=1)
+        # watch_gyro_data = pd.read_csv(syn.get('syn20928636').path)
+        # watch_gyro_data = watch_gyro_data.drop('Unnamed: 0', axis=1)
         phone_accel_data = pd.read_csv(syn.get('syn20928641').path)
-        data = combine_data(watch_accel_data, watch_gyro_data, phone_accel_data)
+        data = combine_data(watch_accel_data, phone_accel_data)
     elif feature_source == FEATURE_SOURCE_PHIL and data_source == SENSOR_WATCH_ACCEL:
         data = pd.read_csv(syn.get('syn21071367').path, sep='\t')
 if data is None or metadata is None:
