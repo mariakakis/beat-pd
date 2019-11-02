@@ -1,6 +1,6 @@
 from settings import *
 from sklearn.feature_selection import SelectPercentile, mutual_info_classif
-from sklearn.pipeline import Pipeline, make_union
+from sklearn.pipeline import Pipeline, make_union, make_pipeline
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
@@ -11,6 +11,8 @@ from sklearn.impute import IterativeImputer, MissingIndicator
 import mord
 import xgboost as xgb
 import scipy.stats
+from sklearn.base import clone
+from resample import bootstrap
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -34,7 +36,6 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
 
     for subject in sorted_subjects:
         print_debug('--------------')
-        print('Subject: %s' % subject)
 
         # Filter subject's data and generate folds, skipping if not enough data
         subj_id_table, folds = preprocess_data(id_table, subject, label_name)
@@ -43,7 +44,7 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
 
         # Go through the folds
         for fold_idx, (id_table_train_idxs, id_table_test_idxs) in enumerate(folds):
-            print_debug('Fold %d' % fold_idx)
+            print('Subject: %s, Fold %d' % (subject, fold_idx))
 
             # Separate train and test IDs
             subj_id_table_train = subj_id_table.iloc[id_table_train_idxs, :]
@@ -109,7 +110,7 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
                 raise Exception('Not a valid model type')
 
             # Create a pipeline
-            pipeline = Pipeline([
+            base_pipeline = Pipeline([
                 ('imputer', make_union(imputer, MissingIndicator())),
                 ('featsel', feature_selection),
                 ('model', base_model)
@@ -123,22 +124,33 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
 
             # Identify ideal parameters using stratified k-fold cross-validation
             cross_validator = StratifiedKFold(n_splits=PARAM_SEARCH_FOLDS, random_state=RANDOM_SEED)
-            grid_search = GridSearchCV(pipeline, param_grid=param_grid, cv=cross_validator)
+            grid_search = GridSearchCV(base_pipeline, param_grid=param_grid, cv=cross_validator)
             grid_search.fit(x_train, y_train)
-            model = pipeline.set_params(**grid_search.best_params_)
-            print('Best params:', grid_search.best_params_)
+            base_pipeline = base_pipeline.set_params(**grid_search.best_params_)
+            print_debug('Best params: %s' % str(grid_search.best_params_))
 
-            # Fit the model and predict classes
-            model.fit(x_train, y_train)
-            preds = model.predict(x_test)
-            probs = model.predict_proba(x_test)
+            # Fit the model with bootstrapping
+            def fit_model(boot_data):
+                pipeline = clone(base_pipeline)
+                x_temp = boot_data[:, :boot_data.shape[1]-1]
+                y_temp = boot_data[:, boot_data.shape[1]-1]
+                pipeline.fit(x_temp, y_temp)
+                return pipeline
+            boot_models = bootstrap.bootstrap(a=np.append(x_train, y_train.reshape(-1, 1), axis=1), f=fit_model,
+                                              b=NUM_BOOTSTRAPS, random_state=RANDOM_SEED)
 
-            # Calculate scores and other subject information
-            scores = calculate_scores(y_train, y_test, train_classes, test_classes, subj_data_test, preds, probs)
-            result = {'subject_id': subject, 'split_id': fold_idx, 'n_total': len(id_table_train_idxs)+len(id_table_test_idxs),
-                      'n_train': len(id_table_train_idxs), 'n_test': len(id_table_test_idxs),
-                      **scores}
-            results = results.append(result, ignore_index=True)
+            for m in boot_models:
+                # Predict using each bootstrapped model
+                boot_pipeline = make_pipeline(m[0], m[1], m[2])
+                preds = boot_pipeline.predict(x_test)
+                probs = boot_pipeline.predict_proba(x_test)
+
+                # Calculate scores and other subject information
+                scores = calculate_scores(y_train, y_test, train_classes, test_classes, subj_data_test, preds, probs)
+                result = {'subject_id': subject, 'split_id': fold_idx, 'n_total': len(id_table_train_idxs)+len(id_table_test_idxs),
+                          'n_train': len(id_table_train_idxs), 'n_test': len(id_table_test_idxs),
+                          **scores}
+                results = results.append(result, ignore_index=True)
 
     # Save results
     results.to_csv(csv_filename, index=False, encoding='utf-8')
