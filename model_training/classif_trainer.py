@@ -89,7 +89,7 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
             # Construct the base model
             missing_class = any([k != train_classes[k] for k in range(len(train_classes))])
             if model_type == CLASSIF_RANDOM_FOREST:
-                base_model = RandomForestClassifier(random_state=RANDOM_SEED)
+                base_model = RandomForestClassifier(bootstrap=False, random_state=RANDOM_SEED)
                 param_grid = {'model__n_estimators': np.arange(10, 51, 10), **param_grid}
             elif model_type == CLASSIF_XGBOOST:
                 base_model = xgb.XGBClassifier(objective="multi:softprob", random_state=RANDOM_SEED)
