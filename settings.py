@@ -8,14 +8,14 @@ import csv
 import synapseclient
 import pickle
 
-DEBUG = False
+DEBUG = True
 NUM_THREADS = 2
 RANDOM_SEED = 812
 
 # Training parameters
 NUM_STRATIFIED_FOLDS = 10 if not DEBUG else 2
 PARAM_SEARCH_FOLDS = 5 if not DEBUG else 2
-NUM_BOOTSTRAPS = 100
+NUM_BOOTSTRAPS = 50 if not DEBUG else 2
 
 if os.name == 'nt':
     HOME_DIRECTORY = os.path.join('C:\\', 'Users', 'atm15.CSENETID', 'Desktop', 'beat-pd')

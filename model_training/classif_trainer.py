@@ -132,8 +132,8 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
             # Fit the model with bootstrapping
             def fit_model(boot_data):
                 pipeline = clone(base_pipeline)
-                x_temp = boot_data[:, :boot_data.shape[1]-1]
-                y_temp = boot_data[:, boot_data.shape[1]-1]
+                x_temp = boot_data[:, :-1]
+                y_temp = boot_data[:, -1].astype(np.int)
                 pipeline.fit(x_temp, y_temp)
                 return pipeline
             boot_models = bootstrap.bootstrap(a=np.append(x_train, y_train.reshape(-1, 1), axis=1), f=fit_model,
@@ -151,6 +151,7 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
                           'n_train': len(id_table_train_idxs), 'n_test': len(id_table_test_idxs),
                           **scores}
                 results = results.append(result, ignore_index=True)
+            return None, None
 
     # Save results
     results.to_csv(csv_filename, index=False, encoding='utf-8')
