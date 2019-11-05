@@ -7,7 +7,7 @@ from sklearn.ensemble import RandomForestClassifier
 class OrdinalRandomForestClassifier(RandomForestClassifier, ClassifierMixin):
     def __init__(self, **kwargs):
         RandomForestClassifier.__init__(self, kwargs)
-        self.base_clf = RandomForestClassifier()
+        self.base_clf = RandomForestClassifier(bootstrap=False)
         self.clfs = {}
         self.unique_class = None
 
