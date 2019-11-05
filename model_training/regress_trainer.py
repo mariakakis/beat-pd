@@ -32,7 +32,6 @@ def train_user_regression(data, id_table, label_name, model_type, run_id):
 
     for subject in sorted_subjects:
         print_debug('--------------')
-        print('Subject: %s' % subject)
 
         # Filter subject's data and generate folds, skipping if not enough data
         subj_id_table, folds = preprocess_data(id_table, subject, label_name)
@@ -41,7 +40,7 @@ def train_user_regression(data, id_table, label_name, model_type, run_id):
 
         # Go through the folds
         for fold_idx, (id_table_train_idxs, id_table_test_idxs) in enumerate(folds):
-            print_debug('Fold %d' % fold_idx)
+            print('Subject: %s Fold: %d' % (subject, fold_idx))
 
             # Separate train and test IDs
             subj_id_table_train = subj_id_table.iloc[id_table_train_idxs, :]
