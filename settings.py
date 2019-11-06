@@ -24,6 +24,7 @@ if os.name == 'nt':
 else:
     HOME_DIRECTORY = os.path.join('/Users', 'alex', 'Desktop', 'beat-pd')
     RUN_PARALLEL = False
+RUN_PARALLEL = True
 
 # Classifiers
 CLASSIF_RANDOM_FOREST = 'classif-rf'
@@ -31,7 +32,7 @@ CLASSIF_XGBOOST = 'classif-xg'
 CLASSIF_MLP = 'classif-mlp'
 CLASSIF_ORDINAL_LOGISTIC = 'classif-ord-log'
 CLASSIF_ORDINAL_RANDOM_FOREST = 'classif-ord-rf'
-CLASSIFIERS = [CLASSIF_XGBOOST, CLASSIF_ORDINAL_LOGISTIC, CLASSIF_RANDOM_FOREST]
+CLASSIFIERS = [ CLASSIF_RANDOM_FOREST, CLASSIF_ORDINAL_LOGISTIC, CLASSIF_XGBOOST]
 
 # Regressors
 REGRESS_XGBOOST = 'regress-xg'

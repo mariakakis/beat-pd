@@ -106,26 +106,27 @@ print('Done processing data')
 label_names = ['on_off', 'dyskinesia', 'tremor']
 csv_files, img_files = [], []
 if not RUN_PARALLEL:
-    for label_name in label_names:
-        for model_type in CLASSIFIERS:
+    for model_type in CLASSIFIERS:
+        for label_name in label_names:
             csv_file, img_file = train_user_classification(data, id_table, label_name, model_type, run_id)
             csv_files.append(csv_file)
             img_files.append(img_file)
-        for model_type in REGRESSORS:
+    for model_type in REGRESSORS:
+        for label_name in label_names:
             csv_file, img_file = train_user_regression(data, id_table, label_name, model_type, run_id)
             csv_files.append(csv_file)
             img_files.append(img_file)
 else:
-    combinations = list(itertools.product(label_names, CLASSIFIERS))
+    combinations = list(itertools.product(CLASSIFIERS, label_names))
     results = Parallel(n_jobs=NUM_THREADS)(delayed(train_user_classification)(data, id_table, label_name, model_type, run_id)
-                                           for (label_name, model_type) in combinations)
+                                           for (model_type, label_name) in combinations)
     for i in range(len(combinations)):
         csv_files.append(results[i][0])
         img_files.append(results[i][1])
 
-    combinations = list(itertools.product(label_names, REGRESSORS))
+    combinations = list(itertools.product(REGRESSORS, label_names))
     results = Parallel(n_jobs=NUM_THREADS)(delayed(train_user_regression)(data, id_table, label_name, model_type, run_id)
-                                           for (label_name, model_type) in combinations)
+                                           for (model_type, label_name) in combinations)
     for i in range(len(combinations)):
         csv_files.append(results[i][0])
         img_files.append(results[i][1])
