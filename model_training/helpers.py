@@ -98,10 +98,10 @@ def calculate_scores(y_train, y_test, train_classes, test_classes, subj_data_tes
     macro_vse, macro_vae = 0, 0
     for c in test_classes:
         idxs = np.where(y_test_bin == c)
-        macro_mse += mean_squared_error(y_test_bin[idxs], preds_bin[idxs]) / len(train_classes)
-        macro_vse += var_squared_error(y_test_bin[idxs], preds_bin[idxs]) / len(train_classes)
-        macro_mae += mean_absolute_error(y_test_bin[idxs], preds_bin[idxs]) / len(train_classes)
-        macro_vae += var_absolute_error(y_test_bin[idxs], preds_bin[idxs]) / len(train_classes)
+        macro_mse += mean_squared_error(y_test_bin[idxs], preds_bin[idxs]) / len(test_classes)
+        macro_vse += var_squared_error(y_test_bin[idxs], preds_bin[idxs]) / len(test_classes)
+        macro_mae += mean_absolute_error(y_test_bin[idxs], preds_bin[idxs]) / len(test_classes)
+        macro_vae += var_absolute_error(y_test_bin[idxs], preds_bin[idxs]) / len(test_classes)
 
     # Compute null model macro-MSE/macro-MAE and the gain
     null_macro_mse, null_macro_mae = 0, 0
@@ -110,10 +110,10 @@ def calculate_scores(y_train, y_test, train_classes, test_classes, subj_data_tes
     macro_mae_trivial = np.ones(preds_bin.shape) * np.median(train_classes)
     for c in test_classes:
         idxs = np.where(y_test_bin == c)
-        null_macro_mse += mean_squared_error(y_test_bin[idxs], macro_mse_trivial[idxs]) / len(train_classes)
-        null_macro_vse += var_squared_error(y_test_bin[idxs], macro_mse_trivial[idxs]) / len(train_classes)
-        null_macro_mae += mean_absolute_error(y_test_bin[idxs], macro_mae_trivial[idxs]) / len(train_classes)
-        null_macro_vae += var_absolute_error(y_test_bin[idxs], macro_mae_trivial[idxs]) / len(train_classes)
+        null_macro_mse += mean_squared_error(y_test_bin[idxs], macro_mse_trivial[idxs]) / len(test_classes)
+        null_macro_vse += var_squared_error(y_test_bin[idxs], macro_mse_trivial[idxs]) / len(test_classes)
+        null_macro_mae += mean_absolute_error(y_test_bin[idxs], macro_mae_trivial[idxs]) / len(test_classes)
+        null_macro_vae += var_absolute_error(y_test_bin[idxs], macro_mae_trivial[idxs]) / len(test_classes)
 
     # Calculate AUCs
     if len(train_classes) > 2:
