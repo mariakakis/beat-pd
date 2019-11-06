@@ -24,7 +24,6 @@ if os.name == 'nt':
 else:
     HOME_DIRECTORY = os.path.join('/Users', 'alex', 'Desktop', 'beat-pd')
     RUN_PARALLEL = False
-RUN_PARALLEL = True
 
 # Classifiers
 CLASSIF_RANDOM_FOREST = 'classif-rf'
