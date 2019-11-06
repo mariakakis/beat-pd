@@ -68,7 +68,7 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
             x_train, x_valid, y_train, y_valid = \
                 train_test_split(x_train, y_train, test_size=FRAC_VALIDATION_DATA, stratify=y_train,
                                  random_state=RANDOM_SEED)
-            train_classes, test_classes = np.unique(y_train), np.unique(y_test)
+            train_classes, valid_classes, test_classes = np.unique(y_train), np.unique(y_valid), np.unique(y_test)
 
             # Make sure that folds don't cut the data in a weird way
             if len(train_classes) <= 1:
@@ -90,7 +90,8 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
             param_grid = {'featsel__percentile': np.arange(25, 101, 25)}
 
             # Construct the base model
-            missing_class = any([k != train_classes[k] for k in range(len(train_classes))])
+            missing_train_class = any([k != train_classes[k] for k in range(len(train_classes))])
+            missing_valid_class = any([k != valid_classes[k] for k in range(len(valid_classes))])
             if model_type == CLASSIF_RANDOM_FOREST:
                 base_model = RandomForestClassifier(random_state=RANDOM_SEED)
                 param_grid = {'model__n_estimators': np.arange(10, 51, 10), **param_grid}
@@ -120,10 +121,13 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
             ])
 
             # Remap classes to fill in gap if one exists
-            if model_type in (CLASSIF_ORDINAL_RANDOM_FOREST, CLASSIF_ORDINAL_LOGISTIC) \
-                    and missing_class:
-                print_debug('Forced to remap labels')
-                y_train = np.array(list(map(lambda x: np.where(train_classes == x), y_train))).flatten()
+            if model_type in (CLASSIF_ORDINAL_RANDOM_FOREST, CLASSIF_ORDINAL_LOGISTIC):
+                if missing_train_class:
+                    print_debug('Forced to remap labels')
+                    y_train = np.array(list(map(lambda x: np.where(train_classes == x), y_train))).flatten()
+                if missing_valid_class:
+                    print_debug('Forced to remap labels')
+                    y_valid = np.array(list(map(lambda x: np.where(valid_classes == x), y_valid))).flatten()
 
             # Identify ideal parameters using stratified k-fold cross-validation on validation data
             cross_validator = StratifiedKFold(n_splits=PARAM_SEARCH_FOLDS, random_state=RANDOM_SEED)
