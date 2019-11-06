@@ -66,7 +66,8 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
             x_test = subj_data_test.drop(['ID', label_name], axis=1).values
             y_test = subj_data_test[label_name].values.astype(np.int)
             x_train, x_valid, y_train, y_valid = \
-                train_test_split(x_train, y_train, test_size=FRAC_VALIDATION_DATA, random_state=RANDOM_SEED)
+                train_test_split(x_train, y_train, test_size=FRAC_VALIDATION_DATA, stratify=y_train,
+                                 random_state=RANDOM_SEED)
             train_classes, test_classes = np.unique(y_train), np.unique(y_test)
 
             # Make sure that folds don't cut the data in a weird way
