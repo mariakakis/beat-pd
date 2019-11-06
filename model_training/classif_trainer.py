@@ -3,7 +3,7 @@ from sklearn.feature_selection import SelectPercentile, mutual_info_classif
 from sklearn.pipeline import Pipeline, make_union
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.model_selection import StratifiedKFold, GridSearchCV
+from sklearn.model_selection import StratifiedKFold, GridSearchCV, train_test_split
 from model_training.ordinal_rf import OrdinalRandomForestClassifier
 from model_training.helpers import preprocess_data, calculate_scores, generate_plots, print_debug
 from sklearn.experimental import enable_iterative_imputer
@@ -13,7 +13,9 @@ import xgboost as xgb
 import scipy.stats
 
 import warnings
+from sklearn.exceptions import ConvergenceWarning
 warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 
 def train_user_classification(data, id_table, label_name, model_type, run_id):
@@ -58,11 +60,13 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
             subj_data_train = pd.merge(subj_data_train, subj_id_table_train[['ID', label_name]], on='ID', how='left')
             subj_data_test = pd.merge(subj_data_test, subj_id_table_test[['ID', label_name]], on='ID', how='left')
 
-            # Separate into features and labels
+            # Separate into (train, validation, test) (features, labels)
             x_train = subj_data_train.drop(['ID', label_name], axis=1).values
-            x_test = subj_data_test.drop(['ID', label_name], axis=1).values
             y_train = subj_data_train[label_name].values.astype(np.int)
+            x_test = subj_data_test.drop(['ID', label_name], axis=1).values
             y_test = subj_data_test[label_name].values.astype(np.int)
+            x_train, x_valid, y_train, y_valid = \
+                train_test_split(x_train, y_train, test_size=FRAC_VALIDATION_DATA, random_state=RANDOM_SEED)
             train_classes, test_classes = np.unique(y_train), np.unique(y_test)
 
             # Make sure that folds don't cut the data in a weird way
@@ -120,15 +124,17 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
                 print_debug('Forced to remap labels')
                 y_train = np.array(list(map(lambda x: np.where(train_classes == x), y_train))).flatten()
 
-            # Identify ideal parameters using stratified k-fold cross-validation
+            # Identify ideal parameters using stratified k-fold cross-validation on validation data
             cross_validator = StratifiedKFold(n_splits=PARAM_SEARCH_FOLDS, random_state=RANDOM_SEED)
             grid_search = GridSearchCV(pipeline, param_grid=param_grid, cv=cross_validator)
-            grid_search.fit(x_train, y_train)
+            grid_search.fit(x_valid, y_valid)
             model = pipeline.set_params(**grid_search.best_params_)
             print('Best params:', grid_search.best_params_)
 
-            # Fit the model and predict classes
+            # Fit the model on train data
             model.fit(x_train, y_train)
+
+            # Predict results on test data
             preds = model.predict(x_test)
             probs = model.predict_proba(x_test)
 

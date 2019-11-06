@@ -14,7 +14,8 @@ RANDOM_SEED = 812
 
 # Training parameters
 NUM_STRATIFIED_FOLDS = 10 if not DEBUG else 2
-PARAM_SEARCH_FOLDS = 5 if not DEBUG else 2
+FRAC_VALIDATION_DATA = 0.2
+PARAM_SEARCH_FOLDS = 3
 NUM_BOOTSTRAPS = 50 if not DEBUG else 2
 
 if os.name == 'nt':
