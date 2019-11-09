@@ -51,7 +51,10 @@ if cis_or_real == DATASET_CIS:
         data = pd.read_csv(syn.get('syn21042208').path, sep='\t')
 elif cis_or_real == DATASET_REAL:
     # Metadata
-    metadata = syn.tableQuery("select * from syn20822276").asDataFrame()
+    if split_structure == SPLIT_STRUCTURE_RANDOM:
+        metadata = syn.tableQuery("select * from syn20822276").asDataFrame()
+    elif split_structure == SPLIT_STRUCTURE_DEFINED:
+        metadata = pd.read_csv(syn.get('syn21141640').path)
 
     # Data
     if feature_source == FEATURE_SOURCE_NICK and data_source == SENSOR_WATCH_ACCEL:
