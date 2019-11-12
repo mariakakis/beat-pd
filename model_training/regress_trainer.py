@@ -7,6 +7,7 @@ from sklearn.neural_network import MLPRegressor
 import xgboost as xgb
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer, MissingIndicator
+from sklearn.neighbors import KNeighborsRegressor
 from model_training.helpers import preprocess_data, calculate_scores, generate_plots, print_debug
 from sklearn.exceptions import ConvergenceWarning
 
@@ -67,6 +68,7 @@ def train_user_regression(data, id_table, label_name, model_type, run_id):
                 train_test_split(x_train, y_train, test_size=FRAC_VALIDATION_DATA, stratify=y_train,
                                  random_state=RANDOM_SEED)
             train_classes, valid_classes, test_classes = np.unique(y_train), np.unique(y_valid), np.unique(y_test)
+            num_features = x_train.shape[1]
 
             # Make sure that folds don't cut the data in a weird way
             if len(train_classes) <= 1:
@@ -80,8 +82,8 @@ def train_user_regression(data, id_table, label_name, model_type, run_id):
                 continue
 
             # Prepare data imputer for missing data
-            imputer = IterativeImputer(random_state=RANDOM_SEED,
-                                       n_nearest_features=5)
+            imputer = IterativeImputer(estimator=KNeighborsRegressor(n_neighbors=int(num_features/5)),
+                                       random_state=RANDOM_SEED)
 
             # Construct the automatic feature selection method
             feature_selection = SelectPercentile(mutual_info_regression)
@@ -93,7 +95,6 @@ def train_user_regression(data, id_table, label_name, model_type, run_id):
                 param_grid = {'model__n_estimators': np.arange(25, 76, 10), **param_grid}
             elif model_type == REGRESS_MLP:
                 base_model = MLPRegressor(max_iter=1000, random_state=RANDOM_SEED)
-                num_features = x_train.shape[1]
                 half_x, quart_x = int(num_features/2), int(num_features/4)
                 param_grid = {'model__hidden_layer_sizes': [(half_x), (half_x, quart_x)], **param_grid}
             else:
