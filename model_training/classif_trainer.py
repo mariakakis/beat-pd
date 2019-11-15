@@ -84,7 +84,7 @@ def train_user_classification(data, id_table, label_name, model_type, run_id):
                 continue
 
             # Prepare data imputer for missing data
-            imputer = IterativeImputer(estimator=KNeighborsRegressor(n_neighbors=int(num_features/5)),
+            imputer = IterativeImputer(estimator=KNeighborsRegressor(n_neighbors=int(num_features/10)),
                                        random_state=RANDOM_SEED)
 
             # Construct the automatic feature selection method
