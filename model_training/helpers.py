@@ -6,13 +6,14 @@ from scipy import stats
 import errno
 
 
-def combine_data(watch_accel, phone_accel):
-    # Rename columns
-    watch_accel.rename(columns=lambda x: '%s_watchaccel' % x if x != 'ID' else x, inplace=True)
-    phone_accel.rename(columns=lambda x: '%s_phoneaccel' % x if x != 'ID' else x, inplace=True)
-
+def combine_data(watch_accel, watch_gyro, phone_accel):
     # Join based on measurement id
-    data = pd.merge(watch_accel, phone_accel, on='ID', how='left')
+    watch_gyro.drop_duplicates(['ID'], inplace=True)
+    phone_accel.drop_duplicates(['ID'], inplace=True)
+    data = pd.merge(watch_accel, watch_gyro, on='ID', how='left',
+                    suffixes=['_watchaccel', '_watchgyro'])
+    data = pd.merge(data, phone_accel, on='ID', how='left',
+                    suffixes=['', '_phoneaccel'])
     data = data.loc[:, ~data.columns.duplicated()]
     print_debug('Done merging data')
 
