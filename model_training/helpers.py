@@ -7,17 +7,34 @@ import errno
 
 
 def combine_data(watch_accel, watch_gyro, phone_accel):
-    # Join based on measurement id
-    watch_gyro.drop_duplicates(['ID'], inplace=True)
-    phone_accel.drop_duplicates(['ID'], inplace=True)
-    data = pd.merge(watch_accel, watch_gyro, on='ID', how='left',
+    # Join based on measurement id and order in the file 
+    watch_accel = add_row_idx(watch_accel)
+    watch_gyro = add_row_idx(watch_gyro)
+    phone_accel = add_row_idx(phone_accel)
+
+    data = pd.merge(watch_accel, watch_gyro, on=['ID', 'ID_index'], how='left',
                     suffixes=['_watchaccel', '_watchgyro'])
-    data = pd.merge(data, phone_accel, on='ID', how='left',
+    data = pd.merge(data, phone_accel, on=['ID', 'ID_index'], how='left',
                     suffixes=['', '_phoneaccel'])
     data = data.loc[:, ~data.columns.duplicated()]
+    # data.dropna(inplace=True) 
+    data.drop(columns=['ID_index'], inplace=True)
     print_debug('Done merging data')
 
     return data
+
+
+def add_row_idx(df):
+    counts_dict = {}
+    counts = []
+    for _, row in df.iterrows():
+        row_id = row['ID']
+        if row_id not in counts_dict:
+            counts_dict[row_id] = 0
+        counts.append(counts_dict[row_id])
+        counts_dict[row_id] = counts_dict[row_id]+1
+    df['ID_index'] = counts
+    return df
 
 
 def preprocess_data(id_table, subject, label_name):
@@ -37,7 +54,7 @@ def preprocess_data(id_table, subject, label_name):
         return None, None
 
     # Skip if not enough variance in data
-    if not (label_counts.gt(10).sum() >= 2 or label_counts.gt(5).sum() >= 5):
+    if not (label_counts.ge(10).sum() >= 2 or label_counts.ge(5).sum() >= 5):
         print_debug('Not enough diversity in the data for this subject')
         return None, None
 

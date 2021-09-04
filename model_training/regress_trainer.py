@@ -64,10 +64,12 @@ def train_user_regression(data, id_table, label_name, model_type, run_id):
             y_train = subj_data_train[label_name].values.astype(np.int)
             x_test = subj_data_test.drop(['ID', label_name], axis=1).values
             y_test = subj_data_test[label_name].values.astype(np.int)
-            x_train, x_valid, y_train, y_valid = \
-                train_test_split(x_train, y_train, test_size=FRAC_VALIDATION_DATA, stratify=y_train,
-                                 random_state=RANDOM_SEED)
-            train_classes, valid_classes, test_classes = np.unique(y_train), np.unique(y_valid), np.unique(y_test)
+            # x_train, x_valid, y_train, y_valid = \
+            #     train_test_split(x_train, y_train, test_size=FRAC_VALIDATION_DATA, stratify=y_train,
+            #                      random_state=RANDOM_SEED)
+            train_classes = np.unique(y_train)
+            test_classes = np.unique(y_test)
+            # valid_classes = np.unique(y_valid)
             num_features = x_train.shape[1]
 
             # Make sure that folds don't cut the data in a weird way
@@ -83,36 +85,40 @@ def train_user_regression(data, id_table, label_name, model_type, run_id):
 
             # Prepare data imputer for missing data
             imputer = IterativeImputer(estimator=KNeighborsRegressor(n_neighbors=int(num_features/10)),
-                                       random_state=RANDOM_SEED)
+                                       add_indicator=True, random_state=RANDOM_SEED)
 
             # Construct the automatic feature selection method
             feature_selection = SelectPercentile(mutual_info_regression)
-            param_grid = {'featsel__percentile': np.arange(25, 101, 25)}
+            # param_grid = {'featsel__percentile': np.arange(25, 101, 25)}
+            param_grid = {'featsel__percentile': 75}
 
             # Construct the base model
             if model_type == REGRESS_XGBOOST:
                 base_model = xgb.XGBRegressor(objective="reg:squarederror", random_state=RANDOM_SEED)
-                param_grid = {'model__n_estimators': np.arange(25, 76, 10), **param_grid}
+                # param_grid = {'model__n_estimators': np.arange(25, 76, 10), **param_grid}
+                param_grid = {'model__n_estimators': 50, **param_grid}
             elif model_type == REGRESS_MLP:
                 base_model = MLPRegressor(max_iter=1000, random_state=RANDOM_SEED)
                 half_x, quart_x = int(num_features/2), int(num_features/4)
-                param_grid = {'model__hidden_layer_sizes': [(half_x), (half_x, quart_x)], **param_grid}
+                # param_grid = {'model__hidden_layer_sizes': [(half_x), (half_x, quart_x)], **param_grid}
+                param_grid = {'model__hidden_layer_sizes': (half_x), **param_grid}
             else:
                 raise Exception('Not a valid model type')
 
             # Create a pipeline
             pipeline = Pipeline([
-                ('imputer', make_union(imputer, MissingIndicator())),
+                ('imputer', imputer),
                 ('featsel', feature_selection),
                 ('model', base_model)
             ])
 
             # Identify ideal parameters using stratified k-fold cross-validation on validation data
-            cross_validator = StratifiedKFold(n_splits=PARAM_SEARCH_FOLDS, random_state=RANDOM_SEED)
-            grid_search = GridSearchCV(pipeline, param_grid=param_grid, cv=cross_validator)
-            grid_search.fit(x_valid, y_valid)
-            model = pipeline.set_params(**grid_search.best_params_)
-            print('Best params:', grid_search.best_params_)
+            # cross_validator = StratifiedKFold(n_splits=PARAM_SEARCH_FOLDS, random_state=RANDOM_SEED)
+            # grid_search = GridSearchCV(pipeline, param_grid=param_grid, cv=cross_validator)
+            # grid_search.fit(x_valid, y_valid)
+            # model = pipeline.set_params(**grid_search.best_params_)
+            # print('Best params:', grid_search.best_params_)
+            model = pipeline.set_params(**param_grid)
 
             # Fit the model on train data
             model.fit(x_train, y_train)
